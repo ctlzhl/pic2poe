@@ -1,0 +1,152 @@
+/* pages/result/result.wxss */
+page {
+  height: 100vh;
+  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+}
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 40rpx;
+}
+
+/* 头部 */
+.header {
+  text-align: center;
+  margin-bottom: 40rpx;
+  margin-top: 20rpx;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: bold;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 结果内容 */
+.result-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.image-wrapper {
+  width: 100%;
+  position: relative;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 12rpx 48rpx rgba(0, 0, 0, 0.15);
+  margin-bottom: 40rpx;
+}
+
+.result-image {
+  width: 100%;
+  display: block;
+}
+
+.watermark {
+  position: absolute;
+  bottom: 20rpx;
+  right: 20rpx;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 24rpx;
+  padding: 8rpx 16rpx;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8rpx;
+}
+
+/* 古诗展示 */
+.poem-display {
+  width: 100%;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+  margin-bottom: 40rpx;
+}
+
+.poem-title {
+  font-size: 28rpx;
+  color: #999;
+  margin-bottom: 20rpx;
+  text-align: center;
+}
+
+.poem-content {
+  font-size: 32rpx;
+  color: #333;
+  line-height: 2;
+  text-align: center;
+  white-space: pre-line;
+  font-family: 'STKaiti', 'KaiTi', serif;
+}
+
+/* 按钮组 */
+.action-buttons {
+  width: 100%;
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 30rpx;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-share {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 44rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  border: none;
+}
+
+.btn-primary::after,
+.btn-secondary::after,
+.btn-share::after {
+  border: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #667eea;
+  border: 2rpx solid #667eea;
+}
+
+.btn-share {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(240, 147, 251, 0.4);
+}
+
+.btn-icon {
+  font-size: 32rpx;
+  margin-bottom: 4rpx;
+}
+
+.btn-text {
+  font-size: 24rpx;
+}
+
+/* 提示 */
+.tips {
+  text-align: center;
+  padding: 20rpx 0;
+}
+
+.tips-text {
+  font-size: 24rpx;
+  color: #999;
+}

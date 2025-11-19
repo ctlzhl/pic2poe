@@ -1,0 +1,23 @@
+# 微信小程序
+node_modules/
+miniprogram_npm/
+
+# 云函数
+cloudfunctions/**/node_modules/
+cloudfunctions/**/.DS_Store
+
+# 敏感配置文件
+cloudfunctions/**/config.json
+project.private.config.json
+
+# 系统文件
+.DS_Store
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# 临时文件
+*.tmp
+*.swp

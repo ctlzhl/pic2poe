@@ -1,0 +1,18 @@
+
+{
+  "pages": [
+    "pages/index/index",
+    "pages/result/result"
+  ],
+  "window": {
+    "navigationBarTitleText": "图生诗境",
+    "navigationBarBackgroundColor": "#667eea",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#fdfbfb",
+    "backgroundTextStyle": "light",
+    "navigationStyle": "default"
+  },
+  "style": "v2",
+  "cloud": true,
+  "sitemapLocation": "sitemap.json"
+}
