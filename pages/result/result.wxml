@@ -1,43 +1,56 @@
 <!--pages/result/result.wxml-->
 <view class="container">
-  <!-- 头部 -->
-  <view class="header">
-    <view class="title">创作完成</view>
+  <!-- 错误状态 -->
+  <view wx:if="{{hasError}}" class="error-container">
+    <view class="error-icon">❌</view>
+    <view class="error-message">{{errorMessage}}</view>
+    <button class="btn-primary" bindtap="backToHome">
+      <text class="btn-icon">↩️</text>
+      <text class="btn-text">返回首页</text>
+    </button>
   </view>
 
-  <!-- 合成图片展示 -->
-  <view class="result-content">
-    <view class="image-wrapper">
-      <image src="{{imageUrl}}" mode="widthFix" class="result-image" show-menu-by-longpress></image>
+  <!-- 正常状态 -->
+  <view wx:else>
+    <!-- 头部 -->
+    <view class="header">
+      <view class="title">创作完成</view>
     </view>
 
-    <!-- 古诗文本展示 -->
-    <view class="poem-display">
-      <view class="poem-title">{{poem.title}}</view>
-      <view class="poem-content">{{poem.body.replace(/\\n/g, '\n')}}</view>
+    <!-- 合成图片展示 -->
+    <view class="result-content">
+      <view class="image-wrapper">
+        <image src="{{previewUrl}}" mode="widthFix" class="result-image" show-menu-by-longpress></image>
+      </view>
+
+      <!-- 古诗文本展示 -->
+      <view class="poem-display">
+        <view class="poem-title">{{poem.title}}</view>
+        <view class="poem-content">{{poem.body}}</view>
+      </view>
     </view>
-  </view>
 
-  <!-- 操作按钮 -->
-  <view class="action-buttons">
-    <button class="btn-secondary" bindtap="backToHome">
-      <text class="btn-icon">🔄</text>
-      <text class="btn-text">重新创作</text>
-    </button>
-    
-    <button class="btn-primary" bindtap="saveImage">
-      <text class="btn-icon">💾</text>
-      <text class="btn-text">保存图片</text>
-    </button>
-    
-    <button class="btn-share" open-type="share">
-      <text class="btn-icon">📤</text>
-      <text class="btn-text">分享好友</text>
-    </button>
-  </view>
+    <!-- 操作按钮 -->
+    <view class="action-buttons">
+      <button class="btn-secondary" bindtap="backToHome">
+        <text class="btn-icon">🔄</text>
+        <text class="btn-text">重新创作</text>
+      </button>
+      
+      <button class="btn-primary" bindtap="saveImage">
+        <text class="btn-icon">💾</text>
+        <text class="btn-text">保存图片</text>
+      </button>
+      
+      <button class="btn-share" open-type="share">
+        <text class="btn-icon">📤</text>
+        <text class="btn-text">分享好友</text>
+      </button>
+    </view>
 
-  <!-- 提示文本 -->
-  <view class="tips">
-    <text class="tips-text">长按图片可保存或转发</text>
+    <!-- 提示文本 -->
+    <view class="tips">
+      <text class="tips-text">长按图片可保存或转发</text>
+    </view>
   </view>
 </view>

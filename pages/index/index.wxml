@@ -35,13 +35,16 @@
       </button>
     </view>
 
-    <!-- 示例展示 -->
-    <view class="examples" wx:if="{{!imageUrl}}">
-      <view class="example-title">创作示例</view>
-      <view class="example-list">
-        <view class="example-item" wx:for="{{examples}}" wx:key="index">
-          <view class="example-img">🏔️</view>
-          <view class="example-poem">{{item.poem}}</view>
+    <!-- 引导提示 -->
+    <view class="guide-card" wx:if="{{!imageUrl}}">
+      <view class="guide-title">三步开启诗意创作</view>
+      <view class="guide-list">
+        <view class="guide-item" wx:for="{{guideList}}" wx:key="title">
+          <view class="guide-index">{{index + 1}}</view>
+          <view class="guide-content">
+            <view class="guide-item-title">{{item.title}}</view>
+            <view class="guide-item-desc">{{item.desc}}</view>
+          </view>
         </view>
       </view>
     </view>

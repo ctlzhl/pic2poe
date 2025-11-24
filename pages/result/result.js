@@ -1,103 +1,128 @@
-// pages/result/result.js
+const downloadFile = (url) =>
+  new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url,
+      success: resolve,
+      fail: reject
+    })
+  })
+
+const saveToAlbum = (filePath) =>
+  new Promise((resolve, reject) => {
+    wx.saveImageToPhotosAlbum({
+      filePath,
+      success: resolve,
+      fail: reject
+    })
+  })
+
 Page({
   data: {
-    originalImageUrl: '',  // 原图URL（用于保存/分享）
-    compressedImageUrl: '', // 压缩后的图片URL（用于展示）
-    poem: {                // 古诗对象
+    previewUrl: '',
+    downloadUrl: '',
+    poem: {
       title: '',
       body: ''
     },
-    canShare: false        // 是否可以分享
+    hasError: false,
+    errorMessage: ''
   },
 
-  onLoad(options) {
-    // 从全局变量获取结果数据
+  onLoad() {
     const app = getApp()
     const result = app.globalData.poemResult
-    
-    if (result) {
-      this.setData({
-        originalImageUrl: result.originalImageUrl,
-        poem: result.poem,
-        canShare: true
-      })
-    }
-  },
 
-  /**
-   * 保存图片到相册
-   */
-  saveImage() {
-    // 下载临时URL图片到本地
-    wx.downloadFile({
-      url: this.data.originalImageUrl,
-      success: res => {
-        // 保存到相册
-        wx.saveImageToPhotosAlbum({
-          filePath: res.tempFilePath,
-          success() {
-            wx.showToast({
-              title: '保存成功',
-              icon: 'success'
-            })
-          },
-          fail(err) {
-            if (err.errMsg.includes('auth deny')) {
-              // 引导用户开启权限
-              wx.showModal({
-                title: '需要相册权限',
-                content: '请在设置中开启相册权限',
-                confirmText: '去设置',
-                success(modalRes) {
-                  if (modalRes.confirm) {
-                    wx.openSetting()
-                  }
-                }
-              })
-            } else {
-              wx.showToast({
-                title: '保存失败',
-                icon: 'none'
-              })
-            }
-          }
-        })
+    if (!result) {
+      this.setError('未获取到创作结果，请返回重试')
+      return
+    }
+
+    const previewUrl = result.displayImageUrl || result.originalImageUrl || ''
+    const downloadUrl = result.originalImageUrl || result.displayImageUrl || ''
+    const poemTitle = result.poem?.title || '无题'
+    const poemBody = (result.poem?.body || '').replace(/\\n/g, '\n')
+
+    if (!previewUrl) {
+      this.setError('图片结果缺失，请重新创作')
+      return
+    }
+
+    this.setData({
+      previewUrl,
+      downloadUrl,
+      poem: {
+        title: poemTitle,
+        body: poemBody
       },
-      fail: err => {
-        console.error('下载图片失败:', err)
-        wx.showToast({
-          title: '保存失败',
-          icon: 'none'
-        })
-      }
+      hasError: false,
+      errorMessage: ''
     })
   },
 
-  /**
-   * 返回首页重新创作
-   */
+  async saveImage() {
+    if (!this.data.downloadUrl) {
+      wx.showToast({ title: '暂无可保存图片', icon: 'none' })
+      return
+    }
+
+    wx.showLoading({ title: '保存中...', mask: true })
+    try {
+      const downloadRes = await downloadFile(this.data.downloadUrl)
+      if (downloadRes.statusCode !== 200 || !downloadRes.tempFilePath) {
+        throw new Error('图片下载失败')
+      }
+
+      await saveToAlbum(downloadRes.tempFilePath)
+      wx.showToast({ title: '保存成功', icon: 'success' })
+    } catch (error) {
+      if (error?.errMsg?.includes('auth deny')) {
+        wx.showModal({
+          title: '需要相册权限',
+          content: '请在设置中开启保存到相册权限',
+          confirmText: '去设置',
+          success: (res) => {
+            if (res.confirm) {
+              wx.openSetting()
+            }
+          }
+        })
+      } else {
+        console.error('保存图片失败:', error)
+        wx.showToast({ title: '保存失败', icon: 'none' })
+      }
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
   backToHome() {
+    const app = getApp()
+    app.globalData.shouldResetSelection = true
+    app.globalData.poemResult = null
     wx.navigateBack()
   },
 
-  /**
-   * 分享给朋友
-   */
   onShareAppMessage() {
     return {
-      title: '我用AI创作了一首诗,快来看看',
+      title: '我用 AI 创作了一首诗，来看看吧',
       path: '/pages/index/index',
-      imageUrl: this.data.originalImageUrl
+      imageUrl: this.data.previewUrl
     }
   },
 
-  /**
-   * 分享到朋友圈
-   */
   onShareTimeline() {
     return {
-      title: '图生诗境 - AI诗意创作',
-      imageUrl: this.data.originalImageUrl
+      title: '图生诗境 - AI 诗意创作',
+      imageUrl: this.data.previewUrl
     }
+  },
+
+  setError(message) {
+    this.setData({
+      hasError: true,
+      errorMessage: message,
+      previewUrl: '',
+      downloadUrl: ''
+    })
   }
 })
