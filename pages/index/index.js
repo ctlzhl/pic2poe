@@ -1,8 +1,13 @@
 const { normalizePoemResult } = require('../../utils/poem')
+const { CURRENT_ENVIRONMENT, getCloudFunctionName } = require('../../utils/env')
+
+const SHARE_TITLE = '拍照上传，生成你的专属古风诗图'
+const SHARE_PATH = '/pages/index/index'
+const SHARE_CARD_IMAGE_PATH = 'https://pic2poe-1336288744.cos.ap-shanghai.myqcloud.com/share-card.jpg'
 
 const guideList = [
   { title: '上传灵感照片', desc: '可从相册选择或直接拍摄，建议画质清晰' },
-  { title: '等待AI创作', desc: '图像将上传至云端，约7秒完成诗意生成' },
+  { title: '等待创作', desc: '图像将上传至云端，约7秒完成诗意生成' },
   { title: '保存与分享', desc: '在结果页保存诗图，转发给朋友或朋友圈' }
 ]
 
@@ -17,11 +22,22 @@ const buildResourceMeta = (tempFile) => {
   if (!localPath) {
     return null
   }
+
+  const width = Number(tempFile.width) || 0
+  const height = Number(tempFile.height) || 0
+  const aspectRatio = width > 0 && height > 0 ? width / height : 0
+  const hasOrientation = width > 0 && height > 0
+  const isPortrait = hasOrientation ? height >= width * 0.98 : null
+  const orientationHint = hasOrientation ? (isPortrait ? 'portrait' : 'landscape') : ''
+
   return {
     localPath,
     size: tempFile.size || 0,
-    width: tempFile.width || 0,
-    height: tempFile.height || 0,
+    width,
+    height,
+    aspectRatio,
+    orientationHint,
+    isPortrait,
     duration: tempFile.duration || 0,
     fileType: tempFile.fileType || 'image',
     createdAt: Date.now(),
@@ -74,6 +90,25 @@ Page({
     resourceMeta: null
   },
 
+  onLoad() {
+    if (wx && typeof wx.showShareMenu === 'function') {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline']
+      })
+    }
+  },
+
+  noop() {},
+
+  handleMainTap() {
+    const { imageUrl, loading } = this.data
+    if (imageUrl || loading) {
+      return
+    }
+    this.chooseImage()
+  },
+
   async chooseImage() {
     try {
       const { tempFiles } = await wx.chooseMedia({
@@ -110,6 +145,10 @@ Page({
       return
     }
 
+    if (this.data.loading) {
+      return
+    }
+
     this.setData({ loading: true })
     wx.showLoading({ title: '诗意创作中...', mask: true })
 
@@ -135,8 +174,11 @@ Page({
 
       this.setData({ resourceMeta: resourceMetaWithCloud })
 
+      const targetFunctionName = getCloudFunctionName('generatePoem')
+      console.info('[generatePoem] 调用云函数:', targetFunctionName, '当前环境:', CURRENT_ENVIRONMENT)
+
       const { result } = await wx.cloud.callFunction({
-        name: 'generatePoem',
+        name: targetFunctionName,
         data: { fileID }
       })
 
@@ -149,8 +191,11 @@ Page({
         throw new Error('AI 创作结果格式异常')
       }
 
+      const rawPoemPayload = result && result.data ? result.data.poem : null
+
       const resultWithResourceMeta = {
         ...normalizedResult,
+        rawPoem: rawPoemPayload,
         resourceMeta: resourceMetaWithCloud
       }
 
@@ -182,6 +227,29 @@ Page({
     if (app.globalData.shouldResetSelection) {
       this.setData({ imageUrl: '', loading: false, resourceMeta: null })
       app.globalData.shouldResetSelection = false
+    }
+
+    if (app.globalData.shouldAutoChooseImage) {
+      app.globalData.shouldAutoChooseImage = false
+      setTimeout(() => {
+        this.chooseImage()
+      }, 200)
+    }
+  },
+
+  onShareAppMessage() {
+    return {
+      title: SHARE_TITLE,
+      path: SHARE_PATH,
+      imageUrl: SHARE_CARD_IMAGE_PATH
+    }
+  },
+
+  onShareTimeline() {
+    return {
+      title: SHARE_TITLE,
+      imageUrl: SHARE_CARD_IMAGE_PATH,
+      query: ''
     }
   }
 })

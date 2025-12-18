@@ -55,18 +55,23 @@
 
 ### 1.5 API调用说明
 
-**当前使用模型**：GLM-4V（视觉理解模型）
+**当前使用模型**：GLM-4V-Flash（免费视觉理解模型）
 
 **API端点**：
 ```
 https://open.bigmodel.cn/api/paas/v4/chat/completions
 ```
+（OpenAI 兼容入口会 301 跳转至此地址，直接使用可避免请求失败）
 
 **请求示例**：
 ```javascript
 {
-  "model": "glm-4v",
+  "model": "glm-4v-flash",
   "messages": [
+    {
+      "role": "system",
+      "content": "你是一位精通古典诗词的文学大师"
+    },
     {
       "role": "user",
       "content": [
@@ -83,14 +88,29 @@ https://open.bigmodel.cn/api/paas/v4/chat/completions
       ]
     }
   ],
-  "temperature": 0.8
+  "temperature": 0.8,
+  "max_tokens": 512
 }
 ```
 
 **参数说明**：
-- `temperature`: 0-1，控制创造性（0.8较为合适）
-- `top_p`: 0-1，核采样参数（0.8推荐）
-- `max_tokens`: 最大生成长度（默认1024）
+- `model`: 固定为 `glm-4v-flash`（免费模型）
+- `messages`: 标准 OpenAI 聊天格式；GLM-4V-Flash 需要 `user` 消息的 `content` 为数组，至少包含一条 `{ type: 'image_url', image_url: { url } }`（填入 `cloud.getTempFileURL` 返回且带 `?sign=` 的临时链接）和一条 `{ type: 'text', text }`（我们的五言绝句提示语），如需更多提示直接扩展 `text`
+- `image_base64`: 备用方案，如需走Base64需自行实现下载与编码
+- `temperature`: 0-2，控制创造性（0.8较为合适，默认1.0）
+
+> 注意：顶层 `image_url` 字段已移除，所有图片链接均通过 `messages[].content` 内的 `image_url` 项传递。
+
+- `top_p`: 0-1，核采样参数（默认0.9）
+- `max_tokens`: 最大生成长度（最大4096，默认1024，建议512）
+- `stream`: 是否流式输出（默认false）
+
+> 日志提示：云函数仅会输出脱敏后的图片URL（签名替换为***），便于排查问题且避免泄露完整签名。
+
+**模型限制**：
+- 单次请求消息上下文（含图片）总大小不超过 8MB
+- 图片尺寸建议不超过 1024×1024、大小不超过 4MB
+- 免费额度下限速约 30 次/分钟（具体查看控制台权益管理）
 
 ### 1.6 监控用量
 

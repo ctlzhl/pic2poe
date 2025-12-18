@@ -1,4 +1,6 @@
 {
   "usingComponents": {},
-  "navigationBarTitleText": "图生诗境"
+  "navigationBarTitleText": "拍照成诗",
+  "enableShareAppMessage": true,
+  "enableShareTimeline": true
 }

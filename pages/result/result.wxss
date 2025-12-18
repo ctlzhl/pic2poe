@@ -1,7 +1,7 @@
 /* pages/result/result.wxss */
 page {
   height: 100vh;
-  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+  background: linear-gradient(125deg, #fdf5e7 0%, #efe0cd 100%);
 }
 
 .container {
@@ -19,28 +19,46 @@ page {
 }
 
 .title {
-  font-size: 48rpx;
+  font-size: 36rpx;
   font-weight: bold;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  line-height: 36rpx;
+  background: linear-gradient(120deg, #b8783c 0%, #deb476 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin: 20rpx 0;
+  letter-spacing: 6rpx;
 }
 
 /* 结果内容 */
 .result-content {
   flex: 1;
+  width: 100%;
+  max-width: 720rpx;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 28rpx;
+}
+
+.content-block {
+  width: 100%;
+}
+
+.image-block {
+  width: 100%;
+  background: #fffdf7;
+  border: 2rpx solid rgba(185, 120, 60, 0.2);
+  border-radius: 30rpx;
+  padding: 28rpx;
+  box-shadow: 0 18rpx 48rpx rgba(89, 60, 34, 0.16);
 }
 
 .image-wrapper {
   width: 100%;
   position: relative;
-  border-radius: 24rpx;
+  border-radius: 26rpx;
   overflow: hidden;
-  box-shadow: 0 12rpx 48rpx rgba(0, 0, 0, 0.15);
-  margin-bottom: 40rpx;
 }
 
 .result-image {
@@ -48,41 +66,33 @@ page {
   display: block;
 }
 
-.watermark {
-  position: absolute;
-  bottom: 20rpx;
-  right: 20rpx;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 24rpx;
-  padding: 8rpx 16rpx;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8rpx;
-}
-
 /* 古诗展示 */
 .poem-display {
   width: 100%;
-  background: #fff;
-  border-radius: 20rpx;
-  padding: 32rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
-  margin-bottom: 40rpx;
+  background: #fff9f1;
+  border-radius: 26rpx;
+  padding: 44rpx 36rpx;
+  box-shadow: 0 20rpx 40rpx rgba(74, 51, 31, 0.14);
+  border: 2rpx solid rgba(166, 109, 58, 0.35);
 }
 
 .poem-title {
-  font-size: 28rpx;
-  color: #999;
-  margin-bottom: 20rpx;
+  font-size: 40rpx;
+  font-weight: 600;
+  color: #3c2516;
+  margin-bottom: 24rpx;
   text-align: center;
+  letter-spacing: 4rpx;
 }
 
 .poem-content {
-  font-size: 32rpx;
-  color: #333;
+  font-size: 36rpx;
+  color: #553a29;
   line-height: 2;
   text-align: center;
+  letter-spacing: 4rpx;
   white-space: pre-line;
-  font-family: 'STKaiti', 'KaiTi', serif;
+  font-family: 'Songti SC', 'STKaiti', 'KaiTi', serif;
 }
 
 /* 按钮组 */
@@ -90,15 +100,15 @@ page {
   width: 100%;
   display: flex;
   gap: 20rpx;
-  margin-bottom: 30rpx;
+  margin: 20rpx 0 10rpx;
 }
 
 .btn-primary,
 .btn-secondary,
 .btn-share {
   flex: 1;
-  height: 88rpx;
-  border-radius: 44rpx;
+  height: 90rpx;
+  border-radius: 46rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -114,41 +124,38 @@ page {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(120deg, #c98b5f 0%, #a5683d 100%);
   color: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.4);
+  box-shadow: 0 12rpx 28rpx rgba(165, 104, 61, 0.35);
 }
 
 .btn-secondary {
-  background: #fff;
-  color: #667eea;
-  border: 2rpx solid #667eea;
+  background: #fff9f3;
+  color: #a5683d;
+  border: 2rpx solid rgba(165, 104, 61, 0.8);
 }
 
 .btn-share {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(120deg, #b83c2c 0%, #de7046 100%);
   color: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(240, 147, 251, 0.4);
-}
-
-.btn-icon {
-  font-size: 32rpx;
-  margin-bottom: 4rpx;
+  box-shadow: 0 12rpx 30rpx rgba(190, 62, 43, 0.35);
 }
 
 .btn-text {
-  font-size: 24rpx;
+  font-size: 26rpx;
+  letter-spacing: 2rpx;
 }
 
-/* 提示 */
-.tips {
-  text-align: center;
-  padding: 20rpx 0;
+.share-status {
+  width: 100%;
+  text-align: right;
+  font-size: 24rpx;
+  color: #7a5a40;
+  margin-bottom: 12rpx;
 }
 
-.tips-text {
-  font-size: 24rpx;
-  color: #999;
+.share-status-error {
+  color: #b13c2c;
 }
 
 /* 错误状态 */
@@ -164,14 +171,15 @@ page {
 
 .error-icon {
   font-size: 80rpx;
-  color: #f5576c;
+  color: #b83c2c;
   margin-bottom: 40rpx;
 }
 
 .error-message {
   font-size: 32rpx;
-  color: #333;
+  color: #3d2a1d;
   margin-bottom: 60rpx;
   line-height: 1.6;
   max-width: 80%;
 }
+

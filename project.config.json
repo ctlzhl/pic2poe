@@ -12,6 +12,7 @@
             "disablePlugins": [],
             "outputPath": ""
         },
+        "useComponentLazyLoad": true, 
         "useCompilerPlugins": false,
         "minifyWXML": true
     },

@@ -2,12 +2,12 @@
 <view class="container">
   <!-- 头部标题 -->
   <view class="header">
-    <view class="title">图生诗境</view>
+    <view class="title">拍照成诗</view>
     <view class="subtitle">让每一张照片都成为诗</view>
   </view>
 
   <!-- 主内容区 -->
-  <view class="main-content">
+  <view class="main-content" bindtap="handleMainTap">
     <!-- 预览图片区域 -->
     <view class="image-preview" wx:if="{{imageUrl}}">
       <image src="{{imageUrl}}" mode="aspectFit" class="preview-img"></image>
@@ -18,25 +18,25 @@
 
     <!-- 占位图 -->
     <view class="image-placeholder" wx:else>
-      <view class="placeholder-icon">📷</view>
+      <image class="placeholder-img" src="/static/img/placeholder-upload.png" mode="aspectFit"></image>
       <text class="placeholder-text">选择一张照片开始创作</text>
     </view>
 
     <!-- 操作按钮 -->
     <view class="action-buttons">
-      <button class="btn-primary" bindtap="chooseImage" wx:if="{{!imageUrl}}">
+      <button class="btn-primary" catchtap="chooseImage" wx:if="{{!imageUrl}}">
         <text class="btn-icon">📷</text>
         <text class="btn-text">选择照片</text>
       </button>
       
-      <button class="btn-primary" bindtap="generatePoem" wx:if="{{imageUrl}}" loading="{{loading}}">
+      <button class="btn-primary" catchtap="generatePoem" wx:if="{{imageUrl}}">
         <text class="btn-icon">✨</text>
-        <text class="btn-text">{{loading ? '创作中...' : '开始创作'}}</text>
+        <text class="btn-text">开始创作</text>
       </button>
     </view>
 
     <!-- 引导提示 -->
-    <view class="guide-card" wx:if="{{!imageUrl}}">
+    <view class="guide-card" catchtap="noop">
       <view class="guide-title">三步开启诗意创作</view>
       <view class="guide-list">
         <view class="guide-item" wx:for="{{guideList}}" wx:key="title">
@@ -50,8 +50,5 @@
     </view>
   </view>
 
-  <!-- 底部说明 -->
-  <view class="footer">
-    <text class="footer-text">由智谱AI倾情创作 · 每张照片都独一无二</text>
-  </view>
+
 </view>

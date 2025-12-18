@@ -2,10 +2,9 @@
 <view class="container">
   <!-- 错误状态 -->
   <view wx:if="{{hasError}}" class="error-container">
-    <view class="error-icon">❌</view>
+    <view class="error-icon">!</view>
     <view class="error-message">{{errorMessage}}</view>
     <button class="btn-primary" bindtap="backToHome">
-      <text class="btn-icon">↩️</text>
       <text class="btn-text">返回首页</text>
     </button>
   </view>
@@ -17,40 +16,50 @@
       <view class="title">创作完成</view>
     </view>
 
-    <!-- 合成图片展示 -->
+    <!-- 合成图片与诗词展示 -->
     <view class="result-content">
-      <view class="image-wrapper">
-        <image src="{{previewUrl}}" mode="widthFix" class="result-image" show-menu-by-longpress></image>
-      </view>
-
       <!-- 古诗文本展示 -->
-      <view class="poem-display">
+      <view class="content-block poem-display">
         <view class="poem-title">{{poem.title}}</view>
         <view class="poem-content">{{poem.body}}</view>
+      </view>
+
+      <!-- 合成图片展示 -->
+      <view class="content-block image-block">
+        <view class="image-wrapper">
+          <image src="{{previewUrl}}" mode="widthFix" class="result-image" show-menu-by-longpress></image>
+        </view>
       </view>
     </view>
 
     <!-- 操作按钮 -->
     <view class="action-buttons">
-      <button class="btn-secondary" bindtap="backToHome">
-        <text class="btn-icon">🔄</text>
-        <text class="btn-text">重新创作</text>
+      <button class="btn-secondary" bindtap="rewritePoem" loading="{{rewriteLoading}}" disabled="{{rewriteLoading}}">
+        <text class="btn-text">重写一首</text>
       </button>
       
-      <button class="btn-primary" bindtap="saveImage">
-        <text class="btn-icon">💾</text>
-        <text class="btn-text">保存图片</text>
+      <button class="btn-secondary" bindtap="changeImageAndRestart" loading="{{changeImageLoading}}" disabled="{{changeImageLoading}}">
+        <text class="btn-text">换图再写</text>
       </button>
       
-      <button class="btn-share" open-type="share">
-        <text class="btn-icon">📤</text>
-        <text class="btn-text">分享好友</text>
+      <button class="btn-share" bindtap="handleSaveShare" loading="{{saveShareLoading}}" disabled="{{saveShareLoading}}">
+        <text class="btn-text">保存分享</text>
       </button>
     </view>
 
-    <!-- 提示文本 -->
-    <view class="tips">
-      <text class="tips-text">长按图片可保存或转发</text>
+    <view class="share-status" wx:if="{{sharePosterStatus === 'preparing'}}">
+      <text>分享长图生成中，约需 3 秒</text>
     </view>
+    <view class="share-status share-status-error" wx:if="{{sharePosterStatus === 'error'}}">
+      <text>{{sharePosterMessage || '分享图生成失败，可点击按钮重试'}}</text>
+    </view>
+
+    <canvas
+      canvas-id="sharePosterCanvas"
+      id="sharePosterCanvas"
+      class="poster-canvas-hidden"
+      style="width: 600px; height: {{posterCanvasHeight}}px; position: absolute; left: -9999px; top: -9999px; opacity: 0;"
+    ></canvas>
+
   </view>
 </view>

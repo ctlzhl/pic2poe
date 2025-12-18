@@ -14,7 +14,9 @@ App({
 
     this.globalData = {
       poemResult: null,
-      shouldResetSelection: false
+      sharePosterMeta: null,
+      shouldResetSelection: false,
+      shouldAutoChooseImage: false
     }
   }
 })
