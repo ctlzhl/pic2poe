@@ -152,6 +152,8 @@ Page({
     this.setData({ loading: true })
     wx.showLoading({ title: '诗意创作中...', mask: true })
 
+    const app = getApp()
+
     const fallbackMetaFromState = this.data.imageUrl
       ? buildResourceMeta({ tempFilePath: this.data.imageUrl })
       : null
@@ -204,16 +206,16 @@ Page({
         resourceMeta: resourceMetaWithCloud
       })
 
-      const app = getApp()
       app.globalData.poemResult = resultWithResourceMeta
       app.globalData.shouldResetSelection = true
 
       wx.navigateTo({ url: '/pages/result/result' })
     } catch (error) {
       console.error('生成流程失败:', error)
+      const errorMessage = formatError(error)
       wx.showModal({
         title: '创作失败',
-        content: formatError(error),
+        content: errorMessage,
         showCancel: false
       })
     } finally {

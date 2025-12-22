@@ -123,19 +123,18 @@ Page({
       return
     }
 
-    const fileID = await this.ensureImageFileReady()
-    if (!fileID) {
-      return
-    }
-
     this.setData({ rewriteLoading: true })
-    wx.showLoading({ title: '重新创作中...', mask: true })
 
     try {
+      const fileID = await this.ensureImageFileReady()
+      if (!fileID) {
+        throw new Error('缺少可用图片，请返回重试')
+      }
+
       const targetFunctionName = getCloudFunctionName('generatePoem')
       const { result } = await wx.cloud.callFunction({
         name: targetFunctionName,
-        data: { fileID }
+        data: { fileID, think_mode: true }
       })
 
       if (!result || result.code !== 0 || !result.data) {
@@ -185,7 +184,6 @@ Page({
       console.error('重新创作失败:', error)
       wx.showToast({ title: error?.message || '重新创作失败', icon: 'none' })
     } finally {
-      wx.hideLoading()
       this.setData({ rewriteLoading: false })
     }
   },
@@ -669,6 +667,8 @@ Page({
     this.resetSharePosterState()
     wx.navigateBack()
   },
+
+  noop() {},
 
   setError(message) {
     this.setData({

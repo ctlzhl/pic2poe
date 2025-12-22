@@ -37,7 +37,7 @@
       <button class="btn-secondary" bindtap="rewritePoem" loading="{{rewriteLoading}}" disabled="{{rewriteLoading}}">
         <text class="btn-text">重写一首</text>
       </button>
-      
+
       <button class="btn-secondary" bindtap="changeImageAndRestart" loading="{{changeImageLoading}}" disabled="{{changeImageLoading}}">
         <text class="btn-text">换图再写</text>
       </button>
@@ -47,9 +47,7 @@
       </button>
     </view>
 
-    <view class="share-status" wx:if="{{sharePosterStatus === 'preparing'}}">
-      <text>分享长图生成中，约需 3 秒</text>
-    </view>
+    
     <view class="share-status share-status-error" wx:if="{{sharePosterStatus === 'error'}}">
       <text>{{sharePosterMessage || '分享图生成失败，可点击按钮重试'}}</text>
     </view>
@@ -60,6 +58,17 @@
       class="poster-canvas-hidden"
       style="width: 600px; height: {{posterCanvasHeight}}px; position: absolute; left: -9999px; top: -9999px; opacity: 0;"
     ></canvas>
+
+    <view wx:if="{{rewriteLoading}}" class="rewrite-overlay" catchtouchmove="noop" bindtap="noop">
+      <view class="rewrite-overlay__glass">
+        <view class="rewrite-overlay__spinner">
+          <view class="rewrite-overlay__dot rewrite-overlay__dot--1"></view>
+          <view class="rewrite-overlay__dot rewrite-overlay__dot--2"></view>
+          <view class="rewrite-overlay__dot rewrite-overlay__dot--3"></view>
+        </view>
+        <view class="rewrite-overlay__text">正在深度思考中</view>
+      </view>
+    </view>
 
   </view>
 </view>

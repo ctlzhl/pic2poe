@@ -110,9 +110,11 @@ page {
   height: 90rpx;
   border-radius: 46rpx;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
+  text-align: center;
+  gap: 12rpx;
   font-size: 24rpx;
   border: none;
 }
@@ -144,6 +146,11 @@ page {
 .btn-text {
   font-size: 26rpx;
   letter-spacing: 2rpx;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .share-status {
@@ -181,5 +188,91 @@ page {
   margin-bottom: 60rpx;
   line-height: 1.6;
   max-width: 80%;
+}
+
+/* 重写蒙层 */
+.rewrite-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 16, 33, 0.72);
+  backdrop-filter: blur(14px);
+  animation: overlayFadeIn 0.18s ease;
+}
+
+.rewrite-overlay__glass {
+  width: 80%;
+  max-width: 620rpx;
+  padding: 48rpx 56rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(145deg, rgba(28, 37, 64, 0.9), rgba(23, 30, 52, 0.78));
+  border: 2rpx solid rgba(163, 199, 255, 0.26);
+  box-shadow: 0 28rpx 64rpx rgba(7, 12, 26, 0.45), inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32rpx;
+}
+
+.rewrite-overlay__text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #a3c7ff;
+  letter-spacing: 4rpx;
+  text-align: center;
+}
+
+.rewrite-overlay__spinner {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.rewrite-overlay__dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #8aa8ff;
+  opacity: 0.85;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+.rewrite-overlay__dot--1 {
+  animation-delay: 0s;
+}
+
+.rewrite-overlay__dot--2 {
+  animation-delay: 0.18s;
+}
+
+.rewrite-overlay__dot--3 {
+  animation-delay: 0.36s;
+}
+
+@keyframes dotPulse {
+  0% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-8rpx);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 

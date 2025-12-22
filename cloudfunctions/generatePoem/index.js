@@ -3,7 +3,7 @@ const cloud = require('wx-server-sdk')
 const axios = require('axios')
 
 const MODEL_NAME = 'glm-4.6v-flash'
-const THINKING_CONFIG = { type: 'enabled' }
+const THINKING_CONFIG = { type: 'disabled' }
 
 const RESPONSE_LOG_MAX = 3000
 const FALLBACK_POEM_TITLE = '拍照成诗'
@@ -257,9 +257,11 @@ cloud.init({
 })
 
 exports.main = async (event, context) => {
-  const { fileID } = event
+  const { fileID, think_mode } = event || {}
+  const isThinkMode = think_mode === true || think_mode === 'true' || think_mode === 1 || think_mode === '1'
   const startTime = Date.now()
   console.log('当前存储分区(STORAGE_PREFIX):', STORAGE_PREFIX)
+  console.log('Think 模式:', isThinkMode ? 'enabled' : 'disabled')
   
   try {
     console.log('开始处理，图片文件ID:', fileID)
@@ -396,7 +398,7 @@ exports.main = async (event, context) => {
       messages,
       temperature: 0.8,
       max_tokens: 1536,
-      thinking: THINKING_CONFIG
+      thinking: isThinkMode ? { type: 'enabled' } : THINKING_CONFIG
     }
     const requestHeaders = {
       'Content-Type': 'application/json',
