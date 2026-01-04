@@ -1,28 +1,12 @@
 const { derivePoemObject, normalizePoemResult } = require('../../utils/poem')
 const { getCloudFunctionName } = require('../../utils/env')
 const { renderPosterToTempFilePath } = require('../../utils/canvasPoster')
+const { downloadFileWithTimeout, saveToAlbumWithTimeout, callFunctionWithTimeout, uploadFileWithTimeout } = require('../../utils/requestHelper')
+const { showErrorToast } = require('../../utils/errorHandler')
 
 const POSTER_QR_URL = 'https://pic2poe.tcloudbaseapp.com/?from=poster'
 const DEFAULT_POSTER_WIDTH = 600
 const DEFAULT_POSTER_HEIGHT = 800
-
-const downloadFile = (url) =>
-  new Promise((resolve, reject) => {
-    wx.downloadFile({
-      url,
-      success: resolve,
-      fail: reject
-    })
-  })
-
-const saveToAlbum = (filePath) =>
-  new Promise((resolve, reject) => {
-    wx.saveImageToPhotosAlbum({
-      filePath,
-      success: resolve,
-      fail: reject
-    })
-  })
 
 const RESULT_FALLBACK_TITLE = '无题'
 
@@ -132,10 +116,7 @@ Page({
       }
 
       const targetFunctionName = getCloudFunctionName('generatePoem')
-      const { result } = await wx.cloud.callFunction({
-        name: targetFunctionName,
-        data: { fileID, think_mode: true }
-      })
+      const { result } = await callFunctionWithTimeout(targetFunctionName, { fileID, think_mode: true })
 
       if (!result || result.code !== 0 || !result.data) {
         throw new Error(result?.message || 'AI 创作失败')
@@ -182,7 +163,7 @@ Page({
       this.prepareSharePoster({ silent: true }).catch(() => {})
     } catch (error) {
       console.error('重新创作失败:', error)
-      wx.showToast({ title: error?.message || '重新创作失败', icon: 'none' })
+      showErrorToast(error, '重新创作失败')
     } finally {
       this.setData({ rewriteLoading: false })
     }
@@ -201,7 +182,7 @@ Page({
     const downloadUrl = this.data.downloadUrl || this.data.previewUrl
     if (downloadUrl) {
       try {
-        const downloadRes = await downloadFile(downloadUrl)
+        const downloadRes = await downloadFileWithTimeout(downloadUrl)
         if (downloadRes.statusCode === 200 && downloadRes.tempFilePath) {
           return await this.uploadLocalImage(downloadRes.tempFilePath, meta)
         }
@@ -221,10 +202,7 @@ Page({
 
     try {
       const cloudPath = `images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
-      const { fileID } = await wx.cloud.uploadFile({
-        cloudPath,
-        filePath: localPath
-      })
+      const { fileID } = await uploadFileWithTimeout(cloudPath, localPath)
 
       this.resourceMeta = {
         ...baseMeta,
@@ -244,7 +222,7 @@ Page({
       return fileID
     } catch (error) {
       console.error('上传图片失败:', error)
-      wx.showToast({ title: '图片上传失败', icon: 'none' })
+      showErrorToast(error, '图片上传失败')
       return ''
     }
   },
@@ -262,7 +240,7 @@ Page({
     }
 
     try {
-      const downloadResult = await downloadFile(downloadUrl)
+      const downloadResult = await downloadFileWithTimeout(downloadUrl)
       if (downloadResult.statusCode === 200 && downloadResult.tempFilePath) {
         return downloadResult.tempFilePath
       }
@@ -332,7 +310,7 @@ Page({
     } catch (error) {
       if (!this.handleAlbumPermissionError(error)) {
         console.error('准备分享图失败:', error)
-        wx.showToast({ title: error?.message || '分享图生成失败', icon: 'none' })
+        showErrorToast(error, '分享图生成失败')
       }
     } finally {
       wx.hideLoading()
@@ -396,25 +374,25 @@ Page({
         throw new Error('图片链接失效')
       }
 
-      let downloadRes = await downloadFile(downloadUrl)
+      let downloadRes = await downloadFileWithTimeout(downloadUrl)
       if (downloadRes.statusCode !== 200 || !downloadRes.tempFilePath) {
         downloadUrl = await this.refreshRemoteImageUrl({ showToastOnError: true })
         if (!downloadUrl) {
           throw new Error('图片链接刷新失败')
         }
-        downloadRes = await downloadFile(downloadUrl)
+        downloadRes = await downloadFileWithTimeout(downloadUrl)
       }
 
       if (downloadRes.statusCode !== 200 || !downloadRes.tempFilePath) {
         throw new Error('图片下载失败')
       }
 
-      await saveToAlbum(downloadRes.tempFilePath)
+      await saveToAlbumWithTimeout(downloadRes.tempFilePath)
       wx.showToast({ title: '保存成功', icon: 'success' })
     } catch (error) {
       if (!this.handleAlbumPermissionError(error)) {
         console.error('保存图片失败:', error)
-        wx.showToast({ title: '保存失败', icon: 'none' })
+        showErrorToast(error, '保存失败')
       }
     } finally {
       wx.hideLoading()

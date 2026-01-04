@@ -1,9 +1,13 @@
 const { normalizePoemResult } = require('../../utils/poem')
 const { CURRENT_ENVIRONMENT, getCloudFunctionName } = require('../../utils/env')
+const { uploadFileWithTimeout, callFunctionWithTimeout } = require('../../utils/requestHelper')
+const { showErrorToast, showCreationError } = require('../../utils/errorHandler')
 
 const SHARE_TITLE = '拍照上传，生成你的专属古风诗图'
 const SHARE_PATH = '/pages/index/index'
 const SHARE_CARD_IMAGE_PATH = 'https://pic2poe-1336288744.cos.ap-shanghai.myqcloud.com/share-card.jpg'
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 const guideList = [
   { title: '上传灵感照片', desc: '可从相册选择或直接拍摄，建议画质清晰' },
@@ -61,7 +65,7 @@ const mergeResourceMetaWithUpload = (resourceMeta, uploadInfo) => {
 
 const persistPoemRecord = async ({ normalizedResult, resourceMeta }) => {
   if (!normalizedResult || !resourceMeta || !poemCollection) {
-    return
+    return { success: false, reason: 'invalid_input' }
   }
   try {
     await poemCollection.add({
@@ -74,13 +78,12 @@ const persistPoemRecord = async ({ normalizedResult, resourceMeta }) => {
         createdAt: db.serverDate()
       }
     })
+    return { success: true }
   } catch (error) {
     console.warn('记录诗歌结果失败:', error)
+    return { success: false, reason: 'db_error', error }
   }
 }
-
-const formatError = (error) =>
-  error?.message || error?.errMsg || '请稍后再试，或检查网络与云函数配置'
 
 Page({
   data: {
@@ -124,6 +127,17 @@ Page({
         throw new Error('未获取到图片路径')
       }
 
+      // 检查文件大小
+      const fileSize = selectedFile?.size || 0
+      if (fileSize > MAX_FILE_SIZE) {
+        wx.showToast({
+          title: `图片过大，请选择${MAX_FILE_SIZE / 1024 / 1024}MB以内的图片`,
+          icon: 'none',
+          duration: 2500
+        })
+        return
+      }
+
       const resourceMeta = buildResourceMeta(selectedFile)
 
       this.setData({
@@ -135,7 +149,7 @@ Page({
         return
       }
       console.error('选择图片失败:', error)
-      wx.showToast({ title: '选择图片失败', icon: 'none' })
+      showErrorToast(error, '选择图片失败')
     }
   },
 
@@ -161,10 +175,7 @@ Page({
 
     try {
       const cloudPath = `images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
-      const { fileID } = await wx.cloud.uploadFile({
-        cloudPath,
-        filePath: this.data.imageUrl
-      })
+      const { fileID } = await uploadFileWithTimeout(cloudPath, this.data.imageUrl)
 
       const resourceMetaWithCloud =
         mergeResourceMetaWithUpload(resourceMetaBeforeUpload, { cloudPath, fileID }) || {
@@ -179,10 +190,7 @@ Page({
       const targetFunctionName = getCloudFunctionName('generatePoem')
       console.info('[generatePoem] 调用云函数:', targetFunctionName, '当前环境:', CURRENT_ENVIRONMENT)
 
-      const { result } = await wx.cloud.callFunction({
-        name: targetFunctionName,
-        data: { fileID }
-      })
+      const { result } = await callFunctionWithTimeout(targetFunctionName, { fileID })
 
       if (!result || result.code !== 0 || !result.data) {
         throw new Error(result?.message || 'AI 创作失败')
@@ -201,10 +209,15 @@ Page({
         resourceMeta: resourceMetaWithCloud
       }
 
-      await persistPoemRecord({
+      const saveResult = await persistPoemRecord({
         normalizedResult: resultWithResourceMeta,
         resourceMeta: resourceMetaWithCloud
       })
+
+      if (!saveResult.success) {
+        console.warn('诗歌记录保存失败，原因:', saveResult.reason)
+        // 不阻断用户流程，仅后台记录
+      }
 
       app.globalData.poemResult = resultWithResourceMeta
       app.globalData.shouldResetSelection = true
@@ -212,12 +225,7 @@ Page({
       wx.navigateTo({ url: '/pages/result/result' })
     } catch (error) {
       console.error('生成流程失败:', error)
-      const errorMessage = formatError(error)
-      wx.showModal({
-        title: '创作失败',
-        content: errorMessage,
-        showCancel: false
-      })
+      showCreationError(error)
     } finally {
       wx.hideLoading()
       this.setData({ loading: false })
