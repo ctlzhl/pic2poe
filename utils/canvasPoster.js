@@ -321,13 +321,28 @@ function drawImagerySummary(context, imagerySummary, textFrame) {
   context.restore()
 }
 
-function drawHorizontalPoem(context, poemTitle, poemLines, textFrame) {
+function drawHorizontalPoem(context, poemTitle, poemLines, textFrame, { avoidQrOverlap = false } = {}) {
   const effectiveLines = Array.isArray(poemLines) ? poemLines : []
   const trimmedLines = effectiveLines
     .map((line) => (line || '').trim())
     .filter((line) => !!line)
 
-  const linesToRender = trimmedLines.slice(0, 4)
+  let linesToRender = trimmedLines.slice(0, 4)
+  if (linesToRender.length >= 2) {
+    const mergedLines = []
+    const pairSeparator = '　'
+    for (let index = 0; index < linesToRender.length; index += 2) {
+      const first = linesToRender[index] || ''
+      const second = linesToRender[index + 1] || ''
+      const combined = second ? `${first}${pairSeparator}${second}`.trim() : first.trim()
+      if (combined) {
+        mergedLines.push(combined)
+      }
+    }
+    if (mergedLines.length) {
+      linesToRender = mergedLines.slice(0, 2)
+    }
+  }
 
   context.save()
   context.setFillStyle(POEM_TEXT_COLOR)
@@ -346,6 +361,9 @@ function drawHorizontalPoem(context, poemTitle, poemLines, textFrame) {
   const totalHeight = titleHeight + bodyHeight
 
   let currentY = textFrame.y + Math.max(0, (textFrame.height - totalHeight) / 2)
+  if (avoidQrOverlap) {
+    currentY = Math.max(textFrame.y + 6, currentY - 24)
+  }
 
   if (poemTitle) {
     context.setFontSize(titleFontSize)
@@ -510,7 +528,7 @@ function renderPosterToTempFilePath(options) {
               if (layout.mode === 'right-text') {
                 drawVerticalPoem(context, poemTitle, poemLines, layout.textFrame)
               } else {
-                drawHorizontalPoem(context, poemTitle, poemLines, layout.textFrame)
+                drawHorizontalPoem(context, poemTitle, poemLines, layout.textFrame, { avoidQrOverlap: true })
               }
               drawQrPlaceholderAndBrand(context, layout)
 

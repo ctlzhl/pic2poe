@@ -3,6 +3,7 @@ const { getCloudFunctionName } = require('../../utils/env')
 const { renderPosterToTempFilePath } = require('../../utils/canvasPoster')
 const { downloadFileWithTimeout, saveToAlbumWithTimeout, callFunctionWithTimeout, uploadFileWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
+const { buildImageCloudPath } = require('../../utils/image')
 
 const POSTER_QR_URL = 'https://pic2poe.tcloudbaseapp.com/?from=poster'
 const DEFAULT_POSTER_WIDTH = 600
@@ -201,7 +202,9 @@ Page({
     }
 
     try {
-      const cloudPath = `images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+      const preferredExtension =
+        baseMeta?.extension || this.resourceMeta?.extension || this.data.resourceMeta?.extension
+      const cloudPath = buildImageCloudPath(localPath, preferredExtension)
       const { fileID } = await uploadFileWithTimeout(cloudPath, localPath)
 
       this.resourceMeta = {
@@ -362,13 +365,45 @@ Page({
   },
 
   async saveImage() {
-    if (!this.data.downloadUrl && !this.resourceMeta?.fileID) {
+    if (!this.data.downloadUrl && !this.resourceMeta?.fileID && !this.resourceMeta?.localPath) {
       wx.showToast({ title: '暂无可保存图片', icon: 'none' })
       return
     }
 
     wx.showLoading({ title: '保存中...', mask: true })
     try {
+      const localPath = this.resourceMeta?.localPath
+      if (localPath) {
+        try {
+          if (typeof wx.getFileInfo === 'function') {
+            await new Promise((resolve, reject) => {
+              wx.getFileInfo({
+                filePath: localPath,
+                success: resolve,
+                fail: reject
+              })
+            })
+          } else if (typeof wx.getFileSystemManager === 'function') {
+            const fs = wx.getFileSystemManager()
+            await new Promise((resolve, reject) => {
+              fs.stat({
+                path: localPath,
+                success: resolve,
+                fail: reject
+              })
+            })
+          }
+          await saveToAlbumWithTimeout(localPath)
+          wx.showToast({ title: '保存成功', icon: 'success' })
+          return
+        } catch (error) {
+          if (this.handleAlbumPermissionError(error)) {
+            return
+          }
+          console.warn('本地图片保存失败，尝试远程下载后保存:', error)
+        }
+      }
+
       let downloadUrl = await this.ensureDownloadUrl()
       if (!downloadUrl) {
         throw new Error('图片链接失效')

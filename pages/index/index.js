@@ -2,6 +2,7 @@ const { normalizePoemResult } = require('../../utils/poem')
 const { CURRENT_ENVIRONMENT, getCloudFunctionName } = require('../../utils/env')
 const { uploadFileWithTimeout, callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast, showCreationError } = require('../../utils/errorHandler')
+const { buildImageCloudPath, getImageExtensionFromPath } = require('../../utils/image')
 
 const SHARE_TITLE = '拍照上传，生成你的专属古风诗图'
 const SHARE_PATH = '/pages/index/index'
@@ -26,6 +27,7 @@ const buildResourceMeta = (tempFile) => {
   if (!localPath) {
     return null
   }
+  const extension = getImageExtensionFromPath(localPath)
 
   const width = Number(tempFile.width) || 0
   const height = Number(tempFile.height) || 0
@@ -36,6 +38,7 @@ const buildResourceMeta = (tempFile) => {
 
   return {
     localPath,
+    extension,
     size: tempFile.size || 0,
     width,
     height,
@@ -174,12 +177,13 @@ Page({
     const resourceMetaBeforeUpload = this.data.resourceMeta || fallbackMetaFromState
 
     try {
-      const cloudPath = `images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+      const cloudPath = buildImageCloudPath(this.data.imageUrl, resourceMetaBeforeUpload?.extension)
       const { fileID } = await uploadFileWithTimeout(cloudPath, this.data.imageUrl)
 
       const resourceMetaWithCloud =
         mergeResourceMetaWithUpload(resourceMetaBeforeUpload, { cloudPath, fileID }) || {
           localPath: this.data.imageUrl,
+          extension: getImageExtensionFromPath(this.data.imageUrl),
           cloudPath,
           fileID,
           uploadedAt: Date.now()
