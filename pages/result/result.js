@@ -8,6 +8,7 @@ const { buildImageCloudPath } = require('../../utils/image')
 const POSTER_QR_URL = 'https://pic2poe.tcloudbaseapp.com/?from=poster'
 const DEFAULT_POSTER_WIDTH = 600
 const DEFAULT_POSTER_HEIGHT = 800
+const POSTER_BG_VERSION = 'gold-dust-v3'
 
 const RESULT_FALLBACK_TITLE = '无题'
 
@@ -311,6 +312,10 @@ Page({
         })
       })
     } catch (error) {
+      const errMsg = error?.errMsg || error?.message || ''
+      if (/cancel|取消/i.test(errMsg)) {
+        return
+      }
       if (!this.handleAlbumPermissionError(error)) {
         console.error('准备分享图失败:', error)
         showErrorToast(error, '分享图生成失败')
@@ -488,7 +493,7 @@ Page({
     const result = app.globalData.poemResult || {}
     const poem = result.poem || {}
     const cloudPath = result.resourceMeta?.cloudPath || ''
-    return `${poem.title || ''}|${poem.body || ''}|${cloudPath || ''}`
+    return `${poem.title || ''}|${poem.body || ''}|${cloudPath || ''}|${POSTER_BG_VERSION}`
   },
 
   resetSharePosterState({ keepApp = false } = {}) {

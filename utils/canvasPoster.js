@@ -1,7 +1,9 @@
-const BACKGROUND_TOP_COLOR = '#fdf8ef'
-const BACKGROUND_BOTTOM_COLOR = '#efe2ca'
+const BACKGROUND_TOP_COLOR = '#f7f1e7'
+const BACKGROUND_BOTTOM_COLOR = '#ebddc7'
 const POEM_TEXT_COLOR = '#3F3A3A'
-const SUMMARY_TEXT_COLOR = '#6B6B6B'
+const BORDER_COLOR = 'rgba(94, 82, 66, 0.18)'
+const GOLD_DUST_LIGHT = 'rgba(192, 164, 124, 0.22)'
+const GOLD_DUST_DARK = 'rgba(158, 130, 96, 0.26)'
 
 const DEFAULT_POSTER_WIDTH = 600
 const DEFAULT_POSTER_HEIGHT = 800
@@ -34,27 +36,48 @@ function drawRoundedRectangle(context, x, y, width, height, radius) {
   context.closePath()
 }
 
+function createTextureRng(seed) {
+  let value = seed % 2147483647
+  if (value <= 0) {
+    value += 2147483646
+  }
+  return () => (value = (value * 16807) % 2147483647) / 2147483647
+}
+
+function drawGoldDustTexture(context, posterWidth, posterHeight) {
+  const rng = createTextureRng(Math.round(posterWidth * 97 + posterHeight * 131))
+  const dotCount = Math.round((posterWidth * posterHeight) / 60)
+
+  context.setFillStyle(GOLD_DUST_LIGHT)
+  for (let i = 0; i < dotCount; i += 1) {
+    const x = rng() * posterWidth
+    const y = rng() * posterHeight
+    const size = 1.6 + rng() * 3.0
+    context.fillRect(x, y, size, size)
+  }
+
+  const accentCount = Math.round(dotCount * 0.35)
+  context.setFillStyle(GOLD_DUST_DARK)
+  for (let i = 0; i < accentCount; i += 1) {
+    const x = rng() * posterWidth
+    const y = rng() * posterHeight
+    const size = 2 + rng() * 3.2
+    context.fillRect(x, y, size, size)
+  }
+}
+
 function drawBackgroundLayer(context, posterWidth, posterHeight) {
   const gradient = context.createLinearGradient(0, 0, 0, posterHeight)
-  gradient.addColorStop(0, '#fdf7ea')
-  gradient.addColorStop(0.4, '#f3e3c6')
-  gradient.addColorStop(1, '#e4cfaa')
+  gradient.addColorStop(0, BACKGROUND_TOP_COLOR)
+  gradient.addColorStop(1, BACKGROUND_BOTTOM_COLOR)
 
   context.setFillStyle(gradient)
   context.fillRect(0, 0, posterWidth, posterHeight)
 
-  context.setFillStyle('rgba(255, 255, 255, 0.06)')
-  const dotSpacing = 20
-  for (let rowIndex = 0; rowIndex < posterHeight; rowIndex += dotSpacing) {
-    for (let columnIndex = 0; columnIndex < posterWidth; columnIndex += dotSpacing) {
-      if ((rowIndex + columnIndex) % (dotSpacing * 2) === 0) {
-        context.fillRect(columnIndex, rowIndex, 1, 1)
-      }
-    }
-  }
+  drawGoldDustTexture(context, posterWidth, posterHeight)
 
-  context.setStrokeStyle('rgba(96, 72, 40, 0.35)')
-  context.setLineWidth(2)
+  context.setStrokeStyle(BORDER_COLOR)
+  context.setLineWidth(1)
   drawRoundedRectangle(context, 18, 18, posterWidth - 36, posterHeight - 36, 18)
   context.stroke()
 }
@@ -277,50 +300,6 @@ function drawVerticalPoem(context, poemTitle, poemLines, textFrame) {
   context.restore()
 }
 
-function drawImagerySummary(context, imagerySummary, textFrame) {
-  const content = (imagerySummary || '').trim()
-  if (!content) {
-    return
-  }
-
-  context.save()
-  context.setFillStyle(SUMMARY_TEXT_COLOR)
-  context.setFontSize(22)
-  context.setTextBaseline('top')
-
-  const maxLineWidth = textFrame.width * 0.7
-  const baseX = textFrame.x
-  const baseY = textFrame.y + textFrame.height * 0.55
-
-  let currentLine = ''
-  const lines = []
-
-  for (let index = 0; index < content.length; index += 1) {
-    const next = currentLine + content[index]
-    const metrics = context.measureText(next)
-    if (metrics.width > maxLineWidth && currentLine) {
-      lines.push(currentLine)
-      currentLine = content[index]
-    } else {
-      currentLine = next
-    }
-  }
-
-  if (currentLine) {
-    lines.push(currentLine)
-  }
-
-  const maxLines = 3
-  const linesToRender = lines.slice(0, maxLines)
-  const lineHeight = 30
-
-  linesToRender.forEach((lineText, index) => {
-    context.fillText(lineText, baseX, baseY + index * lineHeight)
-  })
-
-  context.restore()
-}
-
 function drawHorizontalPoem(context, poemTitle, poemLines, textFrame, { avoidQrOverlap = false } = {}) {
   const effectiveLines = Array.isArray(poemLines) ? poemLines : []
   const trimmedLines = effectiveLines
@@ -427,8 +406,6 @@ function renderPosterToTempFilePath(options) {
   const imagePath = options.imagePath
   const poemTitle = options.poemTitle || ''
   const poemLines = options.poemLines || []
-  const imagerySummary = options.imagerySummary || ''
-
   const baseImageMeta = options.imageMeta || {}
 
   const resolveImageMeta = () =>
