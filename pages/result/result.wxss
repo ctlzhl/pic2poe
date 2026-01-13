@@ -198,19 +198,17 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(11, 16, 33, 0.72);
-  backdrop-filter: blur(14px);
-  animation: overlayFadeIn 0.18s ease;
+  background: rgba(0, 0, 0, 0.35);
+  animation: overlayFadeIn 0.2s ease;
 }
 
-.rewrite-overlay__glass {
-  width: 80%;
-  max-width: 620rpx;
-  padding: 48rpx 56rpx;
-  border-radius: 32rpx;
-  background: linear-gradient(145deg, rgba(28, 37, 64, 0.9), rgba(23, 30, 52, 0.78));
-  border: 2rpx solid rgba(163, 199, 255, 0.26);
-  box-shadow: 0 28rpx 64rpx rgba(7, 12, 26, 0.45), inset 0 1rpx 0 rgba(255, 255, 255, 0.04);
+.rewrite-overlay__toast {
+  min-width: 240rpx;
+  min-height: 200rpx;
+  padding: 36rpx 32rpx;
+  border-radius: 20rpx;
+  background: rgba(0, 0, 0, 0.75);
+  box-shadow: 0 20rpx 40rpx rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -218,53 +216,19 @@ page {
 }
 
 .rewrite-overlay__text {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #a3c7ff;
-  letter-spacing: 4rpx;
+  font-size: 26rpx;
+  color: #fff;
+  letter-spacing: 2rpx;
   text-align: center;
 }
 
 .rewrite-overlay__spinner {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.rewrite-overlay__dot {
-  width: 16rpx;
-  height: 16rpx;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 50%;
-  background: #8aa8ff;
-  opacity: 0.85;
-  animation: dotPulse 1.2s ease-in-out infinite;
-}
-
-.rewrite-overlay__dot--1 {
-  animation-delay: 0s;
-}
-
-.rewrite-overlay__dot--2 {
-  animation-delay: 0.18s;
-}
-
-.rewrite-overlay__dot--3 {
-  animation-delay: 0.36s;
-}
-
-@keyframes dotPulse {
-  0% {
-    transform: translateY(0);
-    opacity: 0.4;
-  }
-  50% {
-    transform: translateY(-8rpx);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 0.4;
-  }
+  border: 6rpx solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: rewriteSpinner 1s linear infinite;
 }
 
 @keyframes overlayFadeIn {
@@ -276,3 +240,8 @@ page {
   }
 }
 
+@keyframes rewriteSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}

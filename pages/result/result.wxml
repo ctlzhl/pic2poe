@@ -34,7 +34,7 @@
 
     <!-- 操作按钮 -->
     <view class="action-buttons">
-      <button class="btn-secondary" bindtap="rewritePoem" loading="{{rewriteLoading}}" disabled="{{rewriteLoading}}">
+      <button class="btn-secondary" bindtap="rewritePoem" disabled="{{rewriteLoading}}">
         <text class="btn-text">重写一首</text>
       </button>
 
@@ -60,13 +60,9 @@
     ></canvas>
 
     <view wx:if="{{rewriteLoading}}" class="rewrite-overlay" catchtouchmove="noop" bindtap="noop">
-      <view class="rewrite-overlay__glass">
-        <view class="rewrite-overlay__spinner">
-          <view class="rewrite-overlay__dot rewrite-overlay__dot--1"></view>
-          <view class="rewrite-overlay__dot rewrite-overlay__dot--2"></view>
-          <view class="rewrite-overlay__dot rewrite-overlay__dot--3"></view>
-        </view>
-        <view class="rewrite-overlay__text">正在深度思考中</view>
+      <view class="rewrite-overlay__toast">
+        <view class="rewrite-overlay__spinner"></view>
+        <view class="rewrite-overlay__text">正在努力创作</view>
       </view>
     </view>
 
