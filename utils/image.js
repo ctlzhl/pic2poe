@@ -1,5 +1,5 @@
 const DEFAULT_IMAGE_EXTENSION = 'jpg'
-const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'heic', 'heif']
+const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 
 const normalizeExtension = (extension) => {
   if (!extension) {

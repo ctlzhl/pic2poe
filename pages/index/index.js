@@ -1,269 +1,202 @@
-const { normalizePoemResult } = require('../../utils/poem')
-const { CURRENT_ENVIRONMENT, getCloudFunctionName } = require('../../utils/env')
 const { uploadFileWithTimeout, callFunctionWithTimeout } = require('../../utils/requestHelper')
-const { showErrorToast, showCreationError } = require('../../utils/errorHandler')
-const { buildImageCloudPath, getImageExtensionFromPath } = require('../../utils/image')
+const { showErrorToast } = require('../../utils/errorHandler')
+const { ALLOWED_IMAGE_EXTENSIONS, getImageExtensionFromPath } = require('../../utils/image')
 
-const SHARE_TITLE = '拍照上传，生成你的专属古风诗图'
-const SHARE_PATH = '/pages/index/index'
-const SHARE_CARD_IMAGE_PATH = 'https://pic2poe-1336288744.cos.ap-shanghai.myqcloud.com/share-card.jpg'
+const MAX_FILE_SIZE = 6 * 1024 * 1024
+const PREPARE_TIMEOUT = 30000
+const HEIC_EXTENSIONS = new Set(['heic', 'heif'])
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-
-const guideList = [
-  { title: '上传灵感照片', desc: '可从相册选择或直接拍摄，建议画质清晰' },
-  { title: '等待创作', desc: '图像将上传至云端，约7秒完成诗意生成' },
-  { title: '保存与分享', desc: '在结果页保存诗图，转发给朋友或朋友圈' }
+const generateTypes = [
+  { value: 'poem', title: '五言绝句', description: '把此刻写成一首诗' },
+  { value: 'review', title: '图评', description: '读出照片里的故事' },
+  { value: 'copy', title: '文案', description: '生成可直接分享的文字' }
 ]
 
-const db = wx.cloud ? wx.cloud.database() : null
-const poemCollection = db ? db.collection('poemRecords') : null
+const moods = [
+  { value: 'auto', title: '自动' },
+  { value: 'warm', title: '温暖' },
+  { value: 'quiet', title: '安静' },
+  { value: 'humorous', title: '幽默' },
+  { value: 'healing', title: '治愈' }
+]
 
-const buildResourceMeta = (tempFile) => {
-  if (!tempFile || typeof tempFile !== 'object') {
-    return null
-  }
-  const localPath = tempFile.tempFilePath || ''
-  if (!localPath) {
-    return null
-  }
-  const extension = getImageExtensionFromPath(localPath)
+const createIdempotencyKey = () => `create_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 
-  const width = Number(tempFile.width) || 0
-  const height = Number(tempFile.height) || 0
-  const aspectRatio = width > 0 && height > 0 ? width / height : 0
-  const hasOrientation = width > 0 && height > 0
-  const isPortrait = hasOrientation ? height >= width * 0.98 : null
-  const orientationHint = hasOrientation ? (isPortrait ? 'portrait' : 'landscape') : ''
+const getImageInfo = (src) => new Promise((resolve, reject) => {
+  wx.getImageInfo({ src, success: resolve, fail: reject })
+})
 
-  return {
-    localPath,
-    extension,
-    size: tempFile.size || 0,
-    width,
-    height,
-    aspectRatio,
-    orientationHint,
-    isPortrait,
-    duration: tempFile.duration || 0,
-    fileType: tempFile.fileType || 'image',
-    createdAt: Date.now(),
-    cloudPath: '',
-    fileID: ''
-  }
+const getImageExtension = async (tempFilePath) => {
+  const extensionFromPath = getImageExtensionFromPath(tempFilePath)
+  if (HEIC_EXTENSIONS.has(extensionFromPath)) return extensionFromPath
+  if (ALLOWED_IMAGE_EXTENSIONS.includes(extensionFromPath)) return extensionFromPath
+
+  const imageInfo = await getImageInfo(tempFilePath)
+  const type = String(imageInfo.type || '').toLowerCase()
+  if (HEIC_EXTENSIONS.has(type)) return type
+  if (type === 'jpeg') return 'jpg'
+  if (ALLOWED_IMAGE_EXTENSIONS.includes(type)) return type
+  return ''
 }
 
-const mergeResourceMetaWithUpload = (resourceMeta, uploadInfo) => {
-  if (!resourceMeta) {
-    return null
-  }
-  const { cloudPath = '', fileID = '' } = uploadInfo || {}
-  return {
-    ...resourceMeta,
-    cloudPath: cloudPath || resourceMeta.cloudPath || '',
-    fileID: fileID || resourceMeta.fileID || '',
-    uploadedAt: Date.now()
-  }
-}
-
-const persistPoemRecord = async ({ normalizedResult, resourceMeta }) => {
-  if (!normalizedResult || !resourceMeta || !poemCollection) {
-    return { success: false, reason: 'invalid_input' }
-  }
-  try {
-    await poemCollection.add({
-      data: {
-        poem: normalizedResult.poem,
-        displayImageUrl: normalizedResult.displayImageUrl || '',
-        originalImageUrl: normalizedResult.originalImageUrl || '',
-        remoteImageUrl: normalizedResult.imageUrl || '',
-        resourceMeta,
-        createdAt: db.serverDate()
-      }
-    })
-    return { success: true }
-  } catch (error) {
-    console.warn('记录诗歌结果失败:', error)
-    return { success: false, reason: 'db_error', error }
-  }
-}
+const getFailureMessage = (result, fallback) => result?.message || fallback
 
 Page({
   data: {
     imageUrl: '',
-    loading: false,
-    guideList,
-    resourceMeta: null
+    assetId: '',
+    idempotencyKey: '',
+    prepareState: 'idle',
+    preparing: false,
+    submitting: false,
+    generateTypes,
+    moods,
+    generateType: 'poem',
+    mood: 'auto',
+    location: '',
+    moment: ''
   },
 
   onLoad() {
-    if (wx && typeof wx.showShareMenu === 'function') {
-      wx.showShareMenu({
-        withShareTicket: true,
-        menus: ['shareAppMessage', 'shareTimeline']
-      })
-    }
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
   },
 
-  noop() {},
-
-  handleMainTap() {
-    const { imageUrl, loading } = this.data
-    if (imageUrl || loading) {
-      return
-    }
-    this.chooseImage()
+  goWorks() {
+    wx.switchTab({ url: '/pages/my/my' })
   },
 
   async chooseImage() {
+    if (this.data.preparing || this.data.submitting) return
+
+    let loadingShown = false
     try {
-      const { tempFiles } = await wx.chooseMedia({
+      const selection = await wx.chooseMedia({
         count: 1,
         mediaType: ['image'],
         sourceType: ['album', 'camera'],
-        sizeType: ['compressed']
+        sizeType: ['original']
       })
+      const file = selection.tempFiles?.[0]
+      const tempFilePath = file?.tempFilePath || ''
+      if (!tempFilePath) throw new Error('未获取到图片路径')
+      if (file.size > MAX_FILE_SIZE) throw new Error('图片过大，请选择 6MB 以内的图片。')
 
-      const selectedFile = tempFiles?.[0]
-      const tempFilePath = selectedFile?.tempFilePath || ''
-      if (!tempFilePath) {
-        throw new Error('未获取到图片路径')
+      let extension = ''
+      try {
+        extension = await getImageExtension(tempFilePath)
+      } catch (error) {
+        console.warn('客户端图片格式识别失败，将由云端继续校验：', error)
       }
-
-      // 检查文件大小
-      const fileSize = selectedFile?.size || 0
-      if (fileSize > MAX_FILE_SIZE) {
-        wx.showToast({
-          title: `图片过大，请选择${MAX_FILE_SIZE / 1024 / 1024}MB以内的图片`,
-          icon: 'none',
-          duration: 2500
+      if (HEIC_EXTENSIONS.has(extension)) {
+        wx.showModal({
+          title: '暂不支持 HEIC 图片',
+          content: '请先将照片导出为 JPG，或在 iPhone「设置－相机－格式」中选择“兼容性最佳”后再拍摄。',
+          showCancel: false,
+          confirmText: '知道了'
         })
         return
       }
-
-      const resourceMeta = buildResourceMeta(selectedFile)
+      if (!extension) throw new Error('暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。')
 
       this.setData({
         imageUrl: tempFilePath,
-        resourceMeta
+        assetId: '',
+        idempotencyKey: '',
+        prepareState: 'pending',
+        preparing: true
+      })
+      wx.showLoading({ title: '正在准备图片…', mask: true })
+      loadingShown = true
+
+      const uploadTicket = await callFunctionWithTimeout('createImageUpload', { extension })
+      if (!uploadTicket.result?.ok) {
+        console.error('createImageUpload 返回失败:', uploadTicket.result)
+        throw new Error(getFailureMessage(uploadTicket.result, '创建上传任务失败，请稍后重试。'))
+      }
+      const { assetId, stagingPath } = uploadTicket.result.data
+      const upload = await uploadFileWithTimeout(stagingPath, tempFilePath)
+      const response = await callFunctionWithTimeout('prepareImage', { assetId, fileID: upload.fileID }, PREPARE_TIMEOUT)
+      if (!response.result?.ok) throw new Error(getFailureMessage(response.result, '图片处理失败，请换一张再试。'))
+
+      this.setData({
+        assetId,
+        idempotencyKey: createIdempotencyKey(),
+        prepareState: 'ready'
       })
     } catch (error) {
-      if (error?.errMsg?.includes('cancel')) {
-        return
-      }
-      console.error('选择图片失败:', error)
-      showErrorToast(error, '选择图片失败')
+      if (error?.errMsg?.includes('cancel')) return
+      console.error('上传并处理图片失败:', error)
+      this.setData({ assetId: '', prepareState: 'error' })
+      showErrorToast(error, '图片处理失败，请换一张再试。')
+    } finally {
+      // 用户在系统选图界面取消时，尚未显示 loading；此时不能调用 hideLoading。
+      if (loadingShown) wx.hideLoading()
+      this.setData({ preparing: false })
     }
   },
 
-  async generatePoem() {
-    if (!this.data.imageUrl) {
-      wx.showToast({ title: '请先选择图片', icon: 'none' })
+  selectGenerateType(event) {
+    this.setData({ generateType: event.currentTarget.dataset.value })
+  },
+
+  selectMood(event) {
+    this.setData({ mood: event.currentTarget.dataset.value })
+  },
+
+  updateLocation(event) {
+    this.setData({ location: event.detail.value })
+  },
+
+  updateMoment(event) {
+    this.setData({ moment: event.detail.value })
+  },
+
+  async startCreation() {
+    const { assetId, idempotencyKey, preparing, submitting, generateType, mood, location, moment } = this.data
+    if (preparing) return
+    if (!assetId) {
+      wx.showToast({ title: '请先选择一张可用图片', icon: 'none' })
       return
     }
+    if (submitting) return
 
-    if (this.data.loading) {
-      return
-    }
-
-    this.setData({ loading: true })
-    wx.showLoading({ title: '诗意创作中...', mask: true })
-
-    const app = getApp()
-
-    const fallbackMetaFromState = this.data.imageUrl
-      ? buildResourceMeta({ tempFilePath: this.data.imageUrl })
-      : null
-    const resourceMetaBeforeUpload = this.data.resourceMeta || fallbackMetaFromState
-
+    this.setData({ submitting: true })
+    wx.showLoading({ title: '正在创建任务…', mask: true })
     try {
-      const cloudPath = buildImageCloudPath(this.data.imageUrl, resourceMetaBeforeUpload?.extension)
-      const { fileID } = await uploadFileWithTimeout(cloudPath, this.data.imageUrl)
-
-      const resourceMetaWithCloud =
-        mergeResourceMetaWithUpload(resourceMetaBeforeUpload, { cloudPath, fileID }) || {
-          localPath: this.data.imageUrl,
-          extension: getImageExtensionFromPath(this.data.imageUrl),
-          cloudPath,
-          fileID,
-          uploadedAt: Date.now()
-        }
-
-      this.setData({ resourceMeta: resourceMetaWithCloud })
-
-      const targetFunctionName = getCloudFunctionName('generatePoem')
-      console.info('[generatePoem] 调用云函数:', targetFunctionName, '当前环境:', CURRENT_ENVIRONMENT)
-
-      const { result } = await callFunctionWithTimeout(targetFunctionName, { fileID })
-
-      if (!result || result.code !== 0 || !result.data) {
-        throw new Error(result?.message || 'AI 创作失败')
-      }
-
-      const normalizedResult = normalizePoemResult(result.data)
-      if (!normalizedResult) {
-        throw new Error('AI 创作结果格式异常')
-      }
-
-      const rawPoemPayload = result && result.data ? result.data.poem : null
-
-      const resultWithResourceMeta = {
-        ...normalizedResult,
-        rawPoem: rawPoemPayload,
-        resourceMeta: resourceMetaWithCloud
-      }
-
-      const saveResult = await persistPoemRecord({
-        normalizedResult: resultWithResourceMeta,
-        resourceMeta: resourceMetaWithCloud
+      const response = await callFunctionWithTimeout('createCreation', {
+        imageAssetId: assetId,
+        generateType,
+        mood,
+        location,
+        moment,
+        idempotencyKey
       })
-
-      if (!saveResult.success) {
-        console.warn('诗歌记录保存失败，原因:', saveResult.reason)
-        // 不阻断用户流程，仅后台记录
+      if (!response.result?.ok) {
+        console.error('createCreation 返回失败:', response.result)
+        throw new Error(getFailureMessage(response.result, '创建创作任务失败，请稍后重试。'))
       }
 
-      app.globalData.poemResult = resultWithResourceMeta
-      app.globalData.shouldResetSelection = true
-
-      wx.navigateTo({ url: '/pages/result/result' })
+      wx.navigateTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}` })
     } catch (error) {
-      console.error('生成流程失败:', error)
-      showCreationError(error)
+      console.error('创建创作任务失败:', error)
+      showErrorToast(error, '创建创作任务失败，请稍后重试。')
     } finally {
       wx.hideLoading()
-      this.setData({ loading: false })
-    }
-  },
-
-  onShow() {
-    const app = getApp()
-    if (app.globalData.shouldResetSelection) {
-      this.setData({ imageUrl: '', loading: false, resourceMeta: null })
-      app.globalData.shouldResetSelection = false
-    }
-
-    if (app.globalData.shouldAutoChooseImage) {
-      app.globalData.shouldAutoChooseImage = false
-      setTimeout(() => {
-        this.chooseImage()
-      }, 200)
+      this.setData({ submitting: false })
     }
   },
 
   onShareAppMessage() {
     return {
-      title: SHARE_TITLE,
-      path: SHARE_PATH,
-      imageUrl: SHARE_CARD_IMAGE_PATH
+      title: '照片有话说，把此刻写下来',
+      path: '/pages/index/index'
     }
   },
 
   onShareTimeline() {
-    return {
-      title: SHARE_TITLE,
-      imageUrl: SHARE_CARD_IMAGE_PATH,
-      query: ''
-    }
+    return { title: '照片有话说，把此刻写下来' }
   }
 })

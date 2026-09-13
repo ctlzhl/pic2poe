@@ -1,70 +1,52 @@
-<!--pages/result/result.wxml-->
-<view class="container">
-  <!-- 错误状态 -->
-  <view wx:if="{{hasError}}" class="error-container">
-    <view class="error-icon">!</view>
-    <view class="error-message">{{errorMessage}}</view>
-    <button class="btn-primary" bindtap="backToHome">
-      <text class="btn-text">返回首页</text>
-    </button>
+<view class="page">
+  <view wx:if="{{loading}}" class="center-state">正在打开作品…</view>
+
+  <view wx:elif="{{hasError}}" class="center-state">
+    <view>{{errorMessage}}</view>
+    <button class="primary-button" bindtap="createAgain">返回创作页</button>
   </view>
 
-  <!-- 正常状态 -->
-  <view wx:else>
-    <!-- 头部 -->
-    <view class="header">
-      <view class="title">创作完成</view>
+  <view wx:else class="content">
+    <view class="eyebrow">照片有话说 · {{typeTitle}}</view>
+    <image class="photo" src="{{work.imageUrl}}" mode="widthFix" show-menu-by-longpress></image>
+
+    <view wx:if="{{work.type === 'poem'}}" class="paper poem-paper">
+      <view class="poem-title">{{work.content.poem.title}}</view>
+      <view wx:for="{{work.content.poem.lines}}" wx:key="*this" class="poem-line">{{item}}</view>
     </view>
 
-    <!-- 合成图片与诗词展示 -->
-    <view class="result-content">
-      <!-- 古诗文本展示 -->
-      <view class="content-block poem-display">
-        <view class="poem-title">{{poem.title}}</view>
-        <view class="poem-content">{{poem.body}}</view>
-      </view>
-
-      <!-- 合成图片展示 -->
-      <view class="content-block image-block">
-        <view class="image-wrapper">
-          <image src="{{previewUrl}}" mode="widthFix" class="result-image" show-menu-by-longpress></image>
-        </view>
-      </view>
+    <view wx:elif="{{work.type === 'review'}}" class="paper">
+      <view class="content-title">{{work.content.review.headline}}</view>
+      <view class="body">{{work.content.review.body}}</view>
+      <view class="tag-list"><text wx:for="{{work.content.review.observations}}" wx:key="*this" class="tag">{{item}}</text></view>
     </view>
 
-    <!-- 操作按钮 -->
-    <view class="action-buttons">
-      <button class="btn-secondary" bindtap="rewritePoem" disabled="{{rewriteLoading}}">
-        <text class="btn-text">重写一首</text>
-      </button>
-
-      <button class="btn-secondary" bindtap="changeImageAndRestart" loading="{{changeImageLoading}}" disabled="{{changeImageLoading}}">
-        <text class="btn-text">换图再写</text>
-      </button>
-      
-      <button class="btn-share" bindtap="handleSaveShare" loading="{{saveShareLoading}}" disabled="{{saveShareLoading}}">
-        <text class="btn-text">保存分享</text>
-      </button>
+    <view wx:else class="paper">
+      <view class="label">{{work.content.copy.label}}</view>
+      <view class="content-title">{{work.content.copy.headline}}</view>
+      <view class="body">{{work.content.copy.body}}</view>
+      <view class="tag-list"><text wx:for="{{work.content.copy.hashtags}}" wx:key="*this" class="tag">{{item}}</text></view>
     </view>
 
-    
-    <view class="share-status share-status-error" wx:if="{{sharePosterStatus === 'error'}}">
-      <text>{{sharePosterMessage || '分享图生成失败，可点击按钮重试'}}</text>
+    <view wx:if="{{shareImageUrl}}" class="share-preview">
+      <view class="share-preview-title">分享成品图</view>
+      <image class="share-image" src="{{shareImageUrl}}" mode="widthFix" show-menu-by-longpress></image>
     </view>
 
-    <canvas
-      canvas-id="sharePosterCanvas"
-      id="sharePosterCanvas"
-      class="poster-canvas-hidden"
-      style="width: 600px; height: {{posterCanvasHeight}}px; position: absolute; left: -9999px; top: -9999px; opacity: 0;"
-    ></canvas>
-
-    <view wx:if="{{rewriteLoading}}" class="rewrite-overlay" catchtouchmove="noop" bindtap="noop">
-      <view class="rewrite-overlay__toast">
-        <view class="rewrite-overlay__spinner"></view>
-        <view class="rewrite-overlay__text">正在努力创作</view>
-      </view>
+    <view wx:if="{{!isShared}}" class="actions">
+      <button wx:if="{{shareToken}}" class="primary-button" open-type="share">发给好友</button>
+      <button wx:elif="{{shareLoading}}" class="primary-button" disabled>正在生成分享图…</button>
+      <button wx:else class="primary-button" bindtap="retryShareCard">生成分享图</button>
+      <view wx:if="{{shareError}}" class="share-error">{{shareError}}</view>
+      <button class="secondary-button" bindtap="showShareTimelineHint">分享到朋友圈</button>
+      <button class="secondary-button" bindtap="saveShareImage">保存分享图</button>
+      <button wx:if="{{isFresh}}" class="text-button" bindtap="rewriteSameImage">{{work.type === 'poem' ? '重写一首' : work.type === 'review' ? '换个角度' : '换一条'}}</button>
+      <button wx:if="{{isFresh}}" class="text-button" bindtap="createAgain">换一张照片</button>
+      <button class="danger-button" loading="{{deleting}}" disabled="{{deleting}}" bindtap="deleteWork">删除这份作品</button>
     </view>
 
+    <view wx:else class="actions">
+      <button class="primary-button" bindtap="createAgain">我也要创作</button>
+    </view>
   </view>
 </view>

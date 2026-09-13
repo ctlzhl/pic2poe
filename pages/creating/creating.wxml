@@ -1,0 +1,22 @@
+<view class="page">
+  <view class="orb"></view>
+  <view class="content">
+    <view class="eyebrow">照片有话说</view>
+    <view class="title">{{status === 'failed' ? '再试一次' : status === 'succeeded' ? '写好了' : '正在创作'}}</view>
+    <view class="status-copy">{{statusText}}</view>
+
+    <view wx:if="{{status !== 'failed' && status !== 'succeeded'}}" class="loader-wrap">
+      <view class="loader"></view>
+      <view class="hint">请不要关闭页面，通常只需要片刻。</view>
+    </view>
+
+    <view wx:if="{{status === 'failed'}}" class="failure-card">
+      <view>{{errorMessage || '这次没有写完，再试一次吧。'}}</view>
+      <view class="attempt">第 {{attemptNumber}} 次尝试</view>
+    </view>
+
+    <button wx:if="{{status === 'failed'}}" class="primary-button" loading="{{retrying}}" bindtap="retry">重新生成</button>
+    <button wx:if="{{status === 'failed'}}" class="secondary-button" bindtap="backToCreate">返回创作页</button>
+    <button wx:if="{{status === 'succeeded'}}" class="primary-button" bindtap="goResult">查看结果</button>
+  </view>
+</view>

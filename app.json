@@ -1,16 +1,33 @@
 
 {
   "pages": [
+    "pages/home/home",
     "pages/index/index",
+    "pages/my/my",
+    "pages/works/works",
+    "pages/settings/settings",
+    "pages/privacy/privacy",
+    "pages/creating/creating",
     "pages/result/result"
   ],
   "window": {
-    "navigationBarTitleText": "拍照成诗",
-    "navigationBarBackgroundColor": "#667eea",
+    "navigationBarTitleText": "照片有话说",
+    "navigationBarBackgroundColor": "#4a684c",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#fdfbfb",
     "backgroundTextStyle": "light",
     "navigationStyle": "default"
+  },
+  "tabBar": {
+    "color": "#71816e",
+    "selectedColor": "#426044",
+    "backgroundColor": "#fdfbfb",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/home", "text": "首页" },
+      { "pagePath": "pages/index/index", "text": "创作" },
+      { "pagePath": "pages/my/my", "text": "我的" }
+    ]
   },
   "style": "v2",
   "cloud": true,

@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="hero">
+    <view class="eyebrow">照片有话说</view>
+    <view class="title">把此刻，写下来</view>
+    <view class="subtitle">一张照片，三种表达。</view>
+  </view>
+
+  <view class="intro-card">
+    <view class="intro-title">让照片有一句自己的话</view>
+    <view class="intro-copy">上传照片后，可以写成一首五言绝句、一段图片点评，或一条配图文案。</view>
+    <button class="primary-button" bindtap="startCreation">开始创作</button>
+  </view>
+
+  <view class="step-list">
+    <view class="step"><text>1</text><view><view>选择一张照片</view><view class="muted">支持 JPG、PNG、WebP</view></view></view>
+    <view class="step"><text>2</text><view><view>选一种表达</view><view class="muted">诗、图评或文案</view></view></view>
+    <view class="step"><text>3</text><view><view>保存或分享作品</view><view class="muted">每一刻都值得留下一种说法</view></view></view>
+  </view>
+
+  <button class="text-button" bindtap="openMyWorks">查看我的作品</button>
+</view>

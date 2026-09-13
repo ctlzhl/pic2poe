@@ -1,700 +1,220 @@
-const { derivePoemObject, normalizePoemResult } = require('../../utils/poem')
-const { getCloudFunctionName } = require('../../utils/env')
-const { renderPosterToTempFilePath } = require('../../utils/canvasPoster')
-const { downloadFileWithTimeout, saveToAlbumWithTimeout, callFunctionWithTimeout, uploadFileWithTimeout } = require('../../utils/requestHelper')
+const { callFunctionWithTimeout, downloadFileWithTimeout, saveToAlbumWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
-const { buildImageCloudPath } = require('../../utils/image')
 
-const POSTER_QR_URL = 'https://pic2poe.tcloudbaseapp.com/?from=poster'
-const DEFAULT_POSTER_WIDTH = 600
-const DEFAULT_POSTER_HEIGHT = 800
-const POSTER_BG_VERSION = 'gold-dust-v3'
+const SHARE_TIMEOUT = 55000
+const TYPE_TITLE = {
+  poem: '五言绝句',
+  review: '图片点评',
+  copy: '配图文案'
+}
 
-const RESULT_FALLBACK_TITLE = '无题'
-
-const resolveImageUrls = (result) => {
-  if (!result || typeof result !== 'object') {
-    return { previewUrl: '', downloadUrl: '' }
-  }
-  const fallback = typeof result.imageUrl === 'string' ? result.imageUrl : ''
-  const previewUrl = result.displayImageUrl || result.originalImageUrl || fallback
-  const downloadUrl = result.originalImageUrl || result.displayImageUrl || fallback
-  return { previewUrl, downloadUrl }
+const parseShareToken = (options = {}) => {
+  if (typeof options.shareToken === 'string' && options.shareToken) return options.shareToken
+  if (typeof options.scene !== 'string' || !options.scene) return ''
+  const scene = decodeURIComponent(options.scene)
+  const match = scene.match(/(?:^|&)s=([A-Za-z0-9_-]{20,32})(?:&|$)/)
+  return match ? match[1] : ''
 }
 
 Page({
-  posterTask: null,
-
   data: {
-    previewUrl: '',
-    downloadUrl: '',
-    poem: {
-      title: '',
-      body: ''
-    },
+    loading: true,
     hasError: false,
     errorMessage: '',
-    resourceMeta: null,
-    rewriteLoading: false,
-    changeImageLoading: false,
-    saveShareLoading: false,
-    sharePosterStatus: 'idle',
-    sharePosterMeta: null,
-    sharePosterMessage: '',
-    posterCanvasHeight: DEFAULT_POSTER_HEIGHT
+    work: null,
+    workId: '',
+    isFresh: false,
+    typeTitle: '',
+    isShared: false,
+    shareToken: '',
+    shareTitle: '照片有话说',
+    shareImageUrl: '',
+    shareLoading: false,
+    shareError: '',
+    deleting: false
   },
 
-  onLoad() {
-    const app = getApp()
-    wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] })
-    const result = app.globalData.poemResult
-
-    if (!result) {
-      this.setError('未获取到创作结果，请返回重试')
-      return
-    }
-
-    const resourceMeta = result.resourceMeta || null
-    this.resourceMeta = resourceMeta
-
-    const { previewUrl: remotePreviewUrl, downloadUrl: remoteDownloadUrl } = resolveImageUrls(result)
-    const localPreviewUrl = resourceMeta?.localPath || ''
-    const normalizedPoem = derivePoemObject(result.poem, RESULT_FALLBACK_TITLE)
-    const poemBody = (normalizedPoem.body || '').replace(/\\n/g, '\n')
-
-    const resolvedPreviewUrl = localPreviewUrl || remotePreviewUrl
-    const resolvedDownloadUrl = remoteDownloadUrl || remotePreviewUrl || localPreviewUrl
-
-    if (!resolvedPreviewUrl) {
-      this.setError('图片结果缺失，请重新创作')
-      return
-    }
-
-    this.setData({
-      previewUrl: resolvedPreviewUrl,
-      downloadUrl: resolvedDownloadUrl,
-      poem: {
-        title: normalizedPoem.title,
-        body: poemBody
-      },
-      hasError: false,
-      errorMessage: '',
-      resourceMeta
+  onLoad(options) {
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
     })
 
-    if (resourceMeta?.fileID) {
-      this.refreshRemoteImageUrl()
+    const shareToken = parseShareToken(options)
+    if (shareToken) {
+      this.loadSharedWork(shareToken)
+      return
     }
 
-    this.posterTask = null
-    this.posterSignature = this.computePosterSignature()
+    const workId = options.workId || ''
+    if (!workId) {
+      this.setData({ loading: false, hasError: true, errorMessage: '未获取到作品，请返回重试。' })
+      return
+    }
+    this.setData({ isFresh: options.fresh === '1' })
+    this.loadWork(workId)
+  },
 
-    const sharePosterMeta = app.globalData.sharePosterMeta
-    if (sharePosterMeta && sharePosterMeta.signature === this.posterSignature) {
+  async loadWork(workId) {
+    try {
+      const response = await callFunctionWithTimeout('getWork', { workId })
+      if (!response.result?.ok) throw new Error(response.result?.message || '读取作品失败')
+      const work = response.result.data
       this.setData({
-        sharePosterStatus: 'ready',
-        sharePosterMeta,
-        sharePosterMessage: ''
+        loading: false,
+        work,
+        workId,
+        typeTitle: TYPE_TITLE[work.type] || '创作结果'
       })
-    } else {
-      if (sharePosterMeta && sharePosterMeta.signature !== this.posterSignature) {
-        app.globalData.sharePosterMeta = null
-      }
-      this.prepareSharePoster({ silent: true }).catch(() => {})
+      this.prepareShareCard(workId)
+    } catch (error) {
+      console.error('读取作品失败:', error)
+      this.setData({ loading: false, hasError: true, errorMessage: error.message || '读取作品失败，请稍后重试。' })
+      showErrorToast(error, '读取作品失败，请稍后重试。')
     }
   },
 
-  async rewritePoem() {
-    if (this.data.rewriteLoading) {
-      return
-    }
-
-    this.setData({ rewriteLoading: true })
-
+  async loadSharedWork(shareToken) {
     try {
-      const fileID = await this.ensureImageFileReady()
-      if (!fileID) {
-        throw new Error('缺少可用图片，请返回重试')
-      }
-
-      const targetFunctionName = getCloudFunctionName('generatePoem')
-      const { result } = await callFunctionWithTimeout(targetFunctionName, { fileID, think_mode: true })
-
-      if (!result || result.code !== 0 || !result.data) {
-        throw new Error(result?.message || 'AI 创作失败')
-      }
-
-      const normalizedResult = normalizePoemResult(result.data, { fallbackTitle: RESULT_FALLBACK_TITLE })
-      if (!normalizedResult) {
-        throw new Error('AI 创作结果格式异常')
-      }
-
-      const rawPoemPayload = result && result.data ? result.data.poem : null
-
-      this.resourceMeta = {
-        ...(this.resourceMeta || {}),
-        fileID
-      }
-
-      const resultWithResourceMeta = {
-        ...normalizedResult,
-        rawPoem: rawPoemPayload,
-        resourceMeta: this.resourceMeta
-      }
-
-      const { previewUrl, downloadUrl } = resolveImageUrls(resultWithResourceMeta)
-      const poemBody = (resultWithResourceMeta.poem.body || '').replace(/\\n/g, '\n')
-
+      const response = await callFunctionWithTimeout('getSharedWork', { shareToken })
+      if (!response.result?.ok) throw new Error(response.result?.message || '读取分享内容失败')
+      const work = response.result.data
       this.setData({
-        poem: {
-          title: resultWithResourceMeta.poem.title,
-          body: poemBody
-        },
-        previewUrl: previewUrl || this.data.previewUrl,
-        downloadUrl: downloadUrl || this.data.downloadUrl,
-        hasError: false,
-        errorMessage: '',
-        resourceMeta: this.resourceMeta
+        loading: false,
+        isShared: true,
+        shareToken,
+        shareTitle: work.shareTitle || '照片有话说',
+        shareImageUrl: work.shareImageUrl || '',
+        work,
+        typeTitle: TYPE_TITLE[work.type] || '创作结果'
       })
-
-      const app = getApp()
-      app.globalData.poemResult = resultWithResourceMeta
-      app.globalData.sharePosterMeta = null
-      this.resetSharePosterState()
-      this.posterSignature = this.computePosterSignature()
-      this.prepareSharePoster({ silent: true }).catch(() => {})
     } catch (error) {
-      console.error('重新创作失败:', error)
-      showErrorToast(error, '重新创作失败')
+      console.error('读取分享内容失败:', error)
+      this.setData({ loading: false, hasError: true, errorMessage: error.message || '分享内容暂不可用。' })
+      showErrorToast(error, '分享内容暂不可用。')
+    }
+  },
+
+  async prepareShareCard(workId = this.data.workId) {
+    if (!workId || this.data.isShared || this.data.shareLoading) return
+    this.setData({ shareLoading: true, shareError: '' })
+    try {
+      const response = await callFunctionWithTimeout('createShareCard', { workId }, SHARE_TIMEOUT)
+      if (!response.result?.ok) {
+        console.error('createShareCard 返回失败:', response.result)
+        throw new Error(response.result?.message || '分享图生成失败')
+      }
+      const share = response.result.data
+      this.setData({
+        shareToken: share.shareToken,
+        shareImageUrl: share.shareImageUrl,
+        shareTitle: share.shareTitle || '照片有话说'
+      })
+    } catch (error) {
+      console.error('生成分享图失败:', error)
+      this.setData({ shareError: error.message || '分享图生成失败，请重试。' })
     } finally {
-      this.setData({ rewriteLoading: false })
+      this.setData({ shareLoading: false })
     }
   },
 
-  async ensureImageFileReady() {
-    const meta = this.resourceMeta || this.data.resourceMeta || {}
-    if (meta.fileID) {
-      return meta.fileID
-    }
-
-    if (meta.localPath) {
-      return await this.uploadLocalImage(meta.localPath, meta)
-    }
-
-    const downloadUrl = this.data.downloadUrl || this.data.previewUrl
-    if (downloadUrl) {
-      try {
-        const downloadRes = await downloadFileWithTimeout(downloadUrl)
-        if (downloadRes.statusCode === 200 && downloadRes.tempFilePath) {
-          return await this.uploadLocalImage(downloadRes.tempFilePath, meta)
-        }
-      } catch (error) {
-        console.error('下载结果图片失败:', error)
-      }
-    }
-
-    wx.showToast({ title: '缺少可用图片，请返回重试', icon: 'none' })
-    return ''
+  retryShareCard() {
+    this.prepareShareCard()
   },
 
-  async uploadLocalImage(localPath, baseMeta = {}) {
-    if (!localPath) {
-      return ''
-    }
-
-    try {
-      const preferredExtension =
-        baseMeta?.extension || this.resourceMeta?.extension || this.data.resourceMeta?.extension
-      const cloudPath = buildImageCloudPath(localPath, preferredExtension)
-      const { fileID } = await uploadFileWithTimeout(cloudPath, localPath)
-
-      this.resourceMeta = {
-        ...baseMeta,
-        ...this.resourceMeta,
-        localPath,
-        cloudPath,
-        fileID,
-        uploadedAt: Date.now()
-      }
-      this.setData({ resourceMeta: this.resourceMeta })
-
-      const app = getApp()
-      if (app.globalData?.poemResult) {
-        app.globalData.poemResult.resourceMeta = this.resourceMeta
-      }
-      this.posterSignature = this.computePosterSignature()
-      return fileID
-    } catch (error) {
-      console.error('上传图片失败:', error)
-      showErrorToast(error, '图片上传失败')
-      return ''
-    }
-  },
-
-  async getPosterSourceImagePath() {
-    const meta = this.resourceMeta || this.data.resourceMeta || {}
-    if (meta.localPath) {
-      return meta.localPath
-    }
-
-    const downloadUrl = await this.ensureDownloadUrl()
-    if (!downloadUrl) {
-      wx.showToast({ title: '图片资源暂不可用，请稍后重试', icon: 'none' })
-      return ''
-    }
-
-    try {
-      const downloadResult = await downloadFileWithTimeout(downloadUrl)
-      if (downloadResult.statusCode === 200 && downloadResult.tempFilePath) {
-        return downloadResult.tempFilePath
-      }
-      wx.showToast({ title: '图片下载失败', icon: 'none' })
-      return ''
-    } catch (error) {
-      console.error('获取分享图源图片失败:', error)
-      wx.showToast({ title: '图片下载失败', icon: 'none' })
-      return ''
-    }
-  },
-
-  changeImageAndRestart() {
-    if (this.data.changeImageLoading) {
+  async saveShareImage() {
+    if (!this.data.shareImageUrl) {
+      wx.showToast({ title: '分享图正在生成，请稍候', icon: 'none' })
       return
     }
-
-    const app = getApp()
-    app.globalData.poemResult = null
-    app.globalData.sharePosterMeta = null
-    app.globalData.shouldResetSelection = true
-
-    this.resetSharePosterState()
-    this.setData({ changeImageLoading: true })
-
-    wx.navigateBack({
-      delta: 1,
-      fail: () => {
-        this.setData({ changeImageLoading: false })
-        wx.reLaunch({ url: '/pages/index/index' })
-      }
-    })
-  },
-
-  async handleSaveShare() {
-    if (this.data.saveShareLoading || this.data.hasError) {
-      return
-    }
-
-    if (this.data.sharePosterStatus === 'preparing') {
-      wx.showToast({ title: '正在生成中', icon: 'none' })
-      return
-    }
-
-    this.setData({ saveShareLoading: true })
-    wx.showLoading({ title: '准备分享图...', mask: true })
-
+    wx.showLoading({ title: '正在保存…', mask: true })
     try {
-      const shouldForce = this.data.sharePosterStatus === 'error'
-      await this.prepareSharePoster({ force: shouldForce, silent: true })
-      const meta = this.data.sharePosterMeta || getApp().globalData.sharePosterMeta
-      if (!meta || (!meta.localTempFilePath && !meta.fileID)) {
-        throw new Error('分享图生成中，请稍后再试')
+      const download = await downloadFileWithTimeout(this.data.shareImageUrl)
+      if (download.statusCode && (download.statusCode < 200 || download.statusCode >= 300)) {
+        throw new Error('分享图下载失败')
       }
-      const localPath = await this.ensureSharePosterLocalPath(meta)
-      if (!localPath) {
-        throw new Error('分享图生成中，请稍后再试')
-      }
-
-      await new Promise((resolve, reject) => {
-        wx.showShareImageMenu({
-          path: localPath,
-          success: resolve,
-          fail: reject
-        })
-      })
+      await saveToAlbumWithTimeout(download.tempFilePath)
+      wx.showToast({ title: '已保存到相册', icon: 'success' })
     } catch (error) {
-      const errMsg = error?.errMsg || error?.message || ''
-      if (/cancel|取消/i.test(errMsg)) {
-        return
-      }
-      if (!this.handleAlbumPermissionError(error)) {
-        console.error('准备分享图失败:', error)
-        showErrorToast(error, '分享图生成失败')
-      }
-    } finally {
-      wx.hideLoading()
-      this.setData({ saveShareLoading: false })
-    }
-  },
-
-  async refreshRemoteImageUrl({ showToastOnError = false } = {}) {
-    if (!this.resourceMeta?.fileID) {
-      return ''
-    }
-    try {
-      const { fileList } = await wx.cloud.getTempFileURL({
-        fileList: [
-          {
-            fileID: this.resourceMeta.fileID,
-            maxAge: 60 * 60
-          }
-        ]
-      })
-      const tempUrl = fileList?.[0]?.tempFileURL || ''
-      if (tempUrl) {
-        const usingLocalPreview =
-          this.resourceMeta?.localPath && this.data.previewUrl === this.resourceMeta.localPath
-        const shouldUpdatePreview =
-          !usingLocalPreview && (!this.data.previewUrl || this.data.previewUrl === this.data.downloadUrl)
-        this.setData({
-          downloadUrl: tempUrl,
-          previewUrl: shouldUpdatePreview ? tempUrl : this.data.previewUrl
-        })
-      }
-      return tempUrl
-    } catch (error) {
-      console.error('刷新云文件链接失败:', error)
-      if (showToastOnError) {
-        wx.showToast({ title: '图片链接刷新失败', icon: 'none' })
-      }
-      return ''
-    }
-  },
-
-  async ensureDownloadUrl() {
-    const currentUrl = this.data.downloadUrl
-    const isRemoteUrl = typeof currentUrl === 'string' && currentUrl.startsWith('http')
-    if (currentUrl && isRemoteUrl) {
-      return currentUrl
-    }
-    return await this.refreshRemoteImageUrl({ showToastOnError: true })
-  },
-
-  async saveImage() {
-    if (!this.data.downloadUrl && !this.resourceMeta?.fileID && !this.resourceMeta?.localPath) {
-      wx.showToast({ title: '暂无可保存图片', icon: 'none' })
-      return
-    }
-
-    wx.showLoading({ title: '保存中...', mask: true })
-    try {
-      const localPath = this.resourceMeta?.localPath
-      if (localPath) {
-        try {
-          if (typeof wx.getFileInfo === 'function') {
-            await new Promise((resolve, reject) => {
-              wx.getFileInfo({
-                filePath: localPath,
-                success: resolve,
-                fail: reject
-              })
-            })
-          } else if (typeof wx.getFileSystemManager === 'function') {
-            const fs = wx.getFileSystemManager()
-            await new Promise((resolve, reject) => {
-              fs.stat({
-                path: localPath,
-                success: resolve,
-                fail: reject
-              })
-            })
-          }
-          await saveToAlbumWithTimeout(localPath)
-          wx.showToast({ title: '保存成功', icon: 'success' })
-          return
-        } catch (error) {
-          if (this.handleAlbumPermissionError(error)) {
-            return
-          }
-          console.warn('本地图片保存失败，尝试远程下载后保存:', error)
-        }
-      }
-
-      let downloadUrl = await this.ensureDownloadUrl()
-      if (!downloadUrl) {
-        throw new Error('图片链接失效')
-      }
-
-      let downloadRes = await downloadFileWithTimeout(downloadUrl)
-      if (downloadRes.statusCode !== 200 || !downloadRes.tempFilePath) {
-        downloadUrl = await this.refreshRemoteImageUrl({ showToastOnError: true })
-        if (!downloadUrl) {
-          throw new Error('图片链接刷新失败')
-        }
-        downloadRes = await downloadFileWithTimeout(downloadUrl)
-      }
-
-      if (downloadRes.statusCode !== 200 || !downloadRes.tempFilePath) {
-        throw new Error('图片下载失败')
-      }
-
-      await saveToAlbumWithTimeout(downloadRes.tempFilePath)
-      wx.showToast({ title: '保存成功', icon: 'success' })
-    } catch (error) {
-      if (!this.handleAlbumPermissionError(error)) {
-        console.error('保存图片失败:', error)
-        showErrorToast(error, '保存失败')
-      }
+      console.error('保存分享图失败:', error)
+      showErrorToast(error, '保存失败，请允许访问相册后重试。')
     } finally {
       wx.hideLoading()
     }
   },
 
-  buildPosterPoemPayload() {
-    const app = getApp()
-    const result = app.globalData.poemResult || {}
-    const poem = result.poem || { title: RESULT_FALLBACK_TITLE, body: '' }
-    const rawPoem = result.rawPoem || {}
-
-    let lines = []
-    if (Array.isArray(rawPoem.poem_lines) && rawPoem.poem_lines.length) {
-      lines = rawPoem.poem_lines
-    } else if (Array.isArray(rawPoem.lines) && rawPoem.lines.length) {
-      lines = rawPoem.lines
-    } else if (typeof rawPoem.body === 'string' && rawPoem.body.trim()) {
-      lines = rawPoem.body
-        .split(/\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-    } else if (typeof poem.body === 'string') {
-      lines = poem.body
-        .split(/\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean)
+  showShareTimelineHint() {
+    if (!this.data.shareToken) {
+      this.prepareShareCard()
+      wx.showToast({ title: '正在生成分享图，请稍候', icon: 'none' })
+      return
     }
+    wx.showToast({ title: '请从右上角菜单选择分享到朋友圈', icon: 'none', duration: 2800 })
+  },
 
-    const imagerySummary =
-      rawPoem.imagery_summary ||
-      rawPoem.imagerySummary ||
-      result.imagerySummary ||
-      this.deriveImagerySummaryFallback(poem.body)
+  async deleteWork() {
+    if (this.data.isShared || this.data.deleting || !this.data.workId) return
+    const confirmation = await new Promise((resolve) => wx.showModal({
+      title: '删除这份作品？',
+      content: '关联图片、分享图和分享链接都会失效，且无法恢复。',
+      confirmText: '删除',
+      confirmColor: '#b65a4d',
+      success: resolve
+    }))
+    if (!confirmation.confirm) return
 
+    this.setData({ deleting: true })
+    try {
+      const response = await callFunctionWithTimeout('deleteWork', { workId: this.data.workId })
+      if (!response.result?.ok) throw new Error(response.result?.message || '删除作品失败')
+      wx.showToast({ title: '作品已删除', icon: 'success' })
+      setTimeout(() => wx.redirectTo({ url: '/pages/works/works' }), 500)
+    } catch (error) {
+      console.error('删除作品失败:', error)
+      showErrorToast(error, '删除作品失败，请稍后重试。')
+      this.setData({ deleting: false })
+    }
+  },
+
+  createAgain() {
+    wx.reLaunch({ url: '/pages/index/index' })
+  },
+
+  async rewriteSameImage() {
+    if (!this.data.isFresh || !this.data.workId || this.data.deleting) return
+    wx.showLoading({ title: '正在重新开始…', mask: true })
+    try {
+      const response = await callFunctionWithTimeout('createCreation', {
+        sourceWorkId: this.data.workId,
+        idempotencyKey: `rewrite_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      })
+      if (!response.result?.ok) throw new Error(response.result?.message || '创建重写任务失败')
+      wx.redirectTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}` })
+    } catch (error) {
+      console.error('同图重写失败:', error)
+      showErrorToast(error, '同图重写失败，请稍后再试。')
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
+  onShareAppMessage() {
+    if (!this.data.shareToken) {
+      return { title: '照片有话说，把此刻写下来', path: '/pages/index/index' }
+    }
     return {
-      title: poem.title || RESULT_FALLBACK_TITLE,
-      body: poem.body || '',
-      lines,
-      imagerySummary
+      title: this.data.shareTitle,
+      path: `/pages/result/result?shareToken=${this.data.shareToken}`,
+      imageUrl: this.data.shareImageUrl || undefined
     }
   },
 
-  deriveImagerySummaryFallback(body = '') {
-    const cleaned = (body || '').replace(/\s+/g, '')
-    if (!cleaned) {
-      return '一帧光影里的静谧余温'
+  onShareTimeline() {
+    if (!this.data.shareToken) return { title: '照片有话说，把此刻写下来' }
+    return {
+      title: this.data.shareTitle,
+      query: `shareToken=${this.data.shareToken}`,
+      imageUrl: this.data.shareImageUrl || undefined
     }
-    return cleaned.slice(0, 24)
-  },
-
-  buildQrPayload() {
-    return POSTER_QR_URL
-  },
-
-  computePosterSignature() {
-    const app = getApp()
-    const result = app.globalData.poemResult || {}
-    const poem = result.poem || {}
-    const cloudPath = result.resourceMeta?.cloudPath || ''
-    return `${poem.title || ''}|${poem.body || ''}|${cloudPath || ''}|${POSTER_BG_VERSION}`
-  },
-
-  resetSharePosterState({ keepApp = false } = {}) {
-    this.posterTask = null
-    this.setData({
-      sharePosterStatus: 'idle',
-      sharePosterMeta: null,
-      sharePosterMessage: '',
-      posterCanvasHeight: DEFAULT_POSTER_HEIGHT
-    })
-    this.posterSignature = this.computePosterSignature()
-    if (!keepApp) {
-      const app = getApp()
-      if (app?.globalData) {
-        app.globalData.sharePosterMeta = null
-      }
-    }
-  },
-
-  syncPosterCanvasHeight(nextHeight) {
-    const normalizedHeight = Math.max(1, Math.round(nextHeight || DEFAULT_POSTER_HEIGHT))
-    if (normalizedHeight === this.data.posterCanvasHeight) {
-      return Promise.resolve()
-    }
-    return new Promise((resolve) => {
-      this.setData({ posterCanvasHeight: normalizedHeight }, resolve)
-    })
-  },
-
-  async prepareSharePoster({ force = false, silent = false } = {}) {
-    const app = getApp()
-    if (this.data.hasError || !app.globalData.poemResult) {
-      return null
-    }
-
-    if (!force) {
-      if (this.data.sharePosterStatus === 'ready' && this.data.sharePosterMeta) {
-        return this.data.sharePosterMeta
-      }
-      if (this.posterTask) {
-        return this.posterTask
-      }
-    } else {
-      this.posterTask = null
-    }
-
-    const execute = async () => {
-      if (!silent) {
-        wx.showLoading({ title: '生成分享图...', mask: true })
-      }
-      this.setData({
-        sharePosterStatus: 'preparing',
-        sharePosterMessage: ''
-      })
-      try {
-        const posterSourceImagePath = await this.getPosterSourceImagePath()
-        if (!posterSourceImagePath) {
-          throw new Error('缺少可用图片')
-        }
-
-        this.posterSignature = this.computePosterSignature()
-        const poemPayload = this.buildPosterPoemPayload()
-
-        const globalResult = app.globalData.poemResult || {}
-        const resourceMeta = globalResult.resourceMeta || this.data.resourceMeta || {}
-        const systemInfo = wx.getSystemInfoSync ? wx.getSystemInfoSync() : null
-        const pixelRatio = (systemInfo && systemInfo.pixelRatio) || 2
-
-        const posterWidth = DEFAULT_POSTER_WIDTH
-        const posterHeight = DEFAULT_POSTER_HEIGHT
-
-        const renderResult = await renderPosterToTempFilePath({
-          canvasId: 'sharePosterCanvas',
-          posterWidth,
-          posterHeight,
-          pixelRatio,
-          imagePath: posterSourceImagePath,
-          poemTitle: poemPayload.title,
-          poemLines: poemPayload.lines,
-          imagerySummary: poemPayload.imagerySummary,
-          qrText: this.buildQrPayload(),
-          imageMeta: {
-            width: resourceMeta.width,
-            height: resourceMeta.height,
-            aspectRatio: resourceMeta.aspectRatio,
-            orientationHint: resourceMeta.orientationHint,
-            isPortrait: resourceMeta.isPortrait
-          },
-          onLayoutResolved: (layout) => this.syncPosterCanvasHeight(layout.posterHeight)
-        })
-
-        if (!renderResult || !renderResult.tempFilePath) {
-          throw new Error('生成分享图失败，请稍后重试')
-        }
-
-        const signature = this.posterSignature || this.computePosterSignature()
-        const sharePosterMeta = {
-          reused: false,
-          fileID: '',
-          cloudPath: '',
-          tempFileURL: '',
-          layout: renderResult.layout || null,
-          meta: {
-            hash: signature,
-            storagePrefix: 'local',
-            generatedAt: new Date().toISOString()
-          },
-          localTempFilePath: renderResult.tempFilePath,
-          signature,
-          generatedAt: Date.now()
-        }
-
-        this.setData({
-          sharePosterStatus: 'ready',
-          sharePosterMeta,
-          sharePosterMessage: ''
-        })
-
-        app.globalData.sharePosterMeta = sharePosterMeta
-        return sharePosterMeta
-      } catch (error) {
-        console.error('分享图生成失败:', error)
-        this.setData({
-          sharePosterStatus: 'error',
-          sharePosterMessage: error?.message || '分享图生成失败'
-        })
-        throw error
-      } finally {
-        if (!silent) {
-          wx.hideLoading()
-        }
-        this.posterTask = null
-      }
-    }
-
-    this.posterTask = execute()
-    return this.posterTask
-  },
-
-  async ensureSharePosterLocalPath(meta) {
-    const currentMeta = meta || this.data.sharePosterMeta || getApp().globalData.sharePosterMeta
-    if (!currentMeta) {
-      return ''
-    }
-
-    if (currentMeta.localTempFilePath) {
-      return currentMeta.localTempFilePath
-    }
-
-    if (currentMeta.fileID) {
-      const downloadRes = await wx.cloud.downloadFile({ fileID: currentMeta.fileID })
-      if (downloadRes.statusCode === 200 && downloadRes.tempFilePath) {
-        const nextMeta = { ...currentMeta, localTempFilePath: downloadRes.tempFilePath }
-        this.setData({ sharePosterMeta: nextMeta })
-        const app = getApp()
-        if (app?.globalData) {
-          app.globalData.sharePosterMeta = nextMeta
-        }
-        return downloadRes.tempFilePath
-      }
-    }
-
-    return ''
-  },
-
-  handleAlbumPermissionError(error) {
-    if (error?.errMsg?.includes('auth deny')) {
-      wx.showModal({
-        title: '需要相册权限',
-        content: '请在设置中开启保存到相册权限',
-        confirmText: '去设置',
-        success: (res) => {
-          if (res.confirm) {
-            wx.openSetting()
-          }
-        }
-      })
-      return true
-    }
-    return false
-  },
-
-  backToHome() {
-    const app = getApp()
-    app.globalData.shouldResetSelection = true
-    app.globalData.shouldAutoChooseImage = false
-    app.globalData.poemResult = null
-    app.globalData.sharePosterMeta = null
-    this.resetSharePosterState()
-    wx.navigateBack()
-  },
-
-  noop() {},
-
-  setError(message) {
-    this.setData({
-      hasError: true,
-      errorMessage: message,
-      previewUrl: '',
-      downloadUrl: ''
-    })
-    this.resetSharePosterState()
   }
 })

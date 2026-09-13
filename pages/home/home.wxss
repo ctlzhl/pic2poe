@@ -1,0 +1,15 @@
+.page { min-height: 100vh; box-sizing: border-box; padding: 64rpx 40rpx 140rpx; background: #fdfbfb; color: #334033; }
+.hero { padding: 36rpx 0 54rpx; }
+.eyebrow { color: #74826f; font-size: 25rpx; letter-spacing: 3rpx; }
+.title { margin-top: 20rpx; font-size: 58rpx; font-weight: 700; letter-spacing: 2rpx; }
+.subtitle { margin-top: 16rpx; color: #74826f; font-size: 29rpx; }
+.intro-card { padding: 44rpx 36rpx; border-radius: 28rpx; background: #edf2e9; }
+.intro-title { font-size: 38rpx; font-weight: 700; }
+.intro-copy { margin: 20rpx 0 32rpx; color: #5c6a59; font-size: 28rpx; line-height: 1.8; }
+.primary-button { background: #4a684c; color: #fff; border-radius: 999rpx; font-size: 30rpx; }
+.step-list { margin-top: 58rpx; }
+.step { display: flex; gap: 24rpx; align-items: center; padding: 26rpx 0; border-bottom: 1rpx solid #e8ece5; font-size: 30rpx; }
+.step > text { display: flex; align-items: center; justify-content: center; width: 44rpx; height: 44rpx; border-radius: 50%; background: #e4ecdf; color: #426044; font-size: 24rpx; }
+.muted { margin-top: 8rpx; color: #849083; font-size: 25rpx; }
+.text-button { margin-top: 50rpx; color: #4a684c; background: transparent; font-size: 28rpx; }
+.text-button::after { border: 0; }

@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="hero">
+    <view class="eyebrow">照片有话说</view>
+    <view class="title">我的作品</view>
+    <view class="subtitle">每一张照片，都留下一种说法。</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state">正在整理作品…</view>
+  <view wx:elif="{{errorMessage}}" class="state">
+    <view>{{errorMessage}}</view>
+    <button class="secondary-button" bindtap="loadWorks">重新加载</button>
+  </view>
+  <view wx:elif="{{!works.length}}" class="state empty-state">
+    <view class="empty-icon">◌</view>
+    <view class="empty-title">还没有作品</view>
+    <view class="empty-copy">从一张照片开始，写下此刻。</view>
+    <button class="primary-button" bindtap="createAgain">开始创作</button>
+  </view>
+  <view wx:else class="work-list">
+    <view wx:for="{{works}}" wx:key="workId" class="work-card">
+      <view class="work-main" data-work-id="{{item.workId}}" bindtap="openWork">
+        <image wx:if="{{item.thumbnailUrl}}" class="thumbnail" src="{{item.thumbnailUrl}}" mode="aspectFill"></image>
+        <view wx:else class="thumbnail placeholder">照片</view>
+        <view class="work-copy">
+          <view class="work-meta">{{item.typeTitle}} · {{item.createdLabel}}</view>
+          <view class="work-title">{{item.title}}</view>
+          <view class="work-excerpt">{{item.excerpt}}</view>
+        </view>
+      </view>
+      <button class="delete-button" data-work-id="{{item.workId}}" loading="{{deletingWorkId === item.workId}}" disabled="{{!!deletingWorkId}}" bindtap="deleteWork">删除</button>
+    </view>
+  </view>
+</view>

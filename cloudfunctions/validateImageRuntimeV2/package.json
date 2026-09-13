@@ -1,0 +1,11 @@
+{
+  "name": "validate-image-runtime-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js 20 P0 validation for CloudBase image processing.",
+  "main": "index.js",
+  "dependencies": {
+    "sharp": "0.33.5",
+    "wx-server-sdk": "2.6.3"
+  }
+}

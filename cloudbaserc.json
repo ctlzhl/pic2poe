@@ -1,0 +1,145 @@
+{
+  "envId": "cloud1-8gefec0p0d1f809d",
+  "region": "ap-shanghai",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "createImageUpload",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "prepareImage",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": false
+    },
+    {
+      "name": "createCreation",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "runCreation",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "dispatch-queued-creations-every-minute",
+          "type": "timer",
+          "config": "0 */1 * * * * *"
+        }
+      ]
+    },
+    {
+      "name": "getCreation",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "getWork",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "listWorks",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "deleteWork",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "createShareCard",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 60,
+      "memorySize": 512,
+      "installDependency": false
+    },
+    {
+      "name": "getSharedWork",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "retryCreation",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "recoverStuckTasks",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "recover-stuck-tasks-every-minute",
+          "type": "timer",
+          "config": "0 */1 * * * * *"
+        }
+      ]
+    },
+    {
+      "name": "cleanupExpiredAssets",
+      "type": "Event",
+      "handler": "index.main",
+      "runtime": "Nodejs20.19",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "cleanup-expired-assets-every-15-minutes",
+          "type": "timer",
+          "config": "0 */15 * * * * *"
+        }
+      ]
+    }
+  ]
+}

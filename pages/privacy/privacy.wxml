@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="title">照片与隐私说明</view>
+  <view class="section"><view class="heading">我们如何使用照片</view><view>你选择的照片仅用于图片预处理、内容生成、作品展示和分享图合成。客户端不会直接读取新版业务数据库。</view></view>
+  <view class="section"><view class="heading">保存期限</view><view>原图会在上传 24 小时后进入清理流程；成功作品使用经处理的创作图和缩略图。删除作品后，关联图片、分享图和分享链接均会失效且不可恢复。</view></view>
+  <view class="section"><view class="heading">公开分享</view><view>只有你主动分享后，他人才能通过不可猜测的分享凭证查看该作品。分享不公开你的微信身份、原始照片文件或填写的精确地点。</view></view>
+  <view class="section"><view class="heading">你的选择</view><view>你可以随时在“我的作品”中删除作品；相机与相册权限可在微信系统设置中管理。</view></view>
+</view>

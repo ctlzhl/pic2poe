@@ -29,7 +29,13 @@ const ERROR_PATTERNS = [
   // 文件过大
   {
     patterns: [/fail_size|too large|图片.*过大|file too big/i],
-    message: '图片过大，请选择10MB以内的图片'
+    message: '图片过大，请选择 6MB 以内的图片'
+  },
+
+  // 新版图片格式
+  {
+    patterns: [/暂不支持这种图片格式|JPG、PNG 或 WebP/i],
+    message: '暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。'
   },
 
   // 服务器错误
