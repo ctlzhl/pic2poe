@@ -23,6 +23,9 @@ const safeUrl = (value = '') => {
   return /^https:\/\//i.test(url) ? url : ''
 }
 
+const HIDDEN_CATEGORY_IDS = Object.freeze([343, 398])
+const HIDDEN_CATEGORY_NAMES = new Set(['昨年今日', '就是瞎拍'])
+
 const removeLeadingSummary = (value = '') => {
   const html = String(value)
   const firstContentTag = html.search(/<(?:h[1-6]|p|ul|ol|blockquote|img)\b/i)
@@ -72,7 +75,7 @@ const normalizeCategories = (categories = []) => (Array.isArray(categories) ? ca
     id: Number(category?.id) || 0,
     name: stripInlineHtml(category?.name || '')
   }))
-  .filter((category) => category.id > 0 && category.name)
+  .filter((category) => category.id > 0 && category.name && !HIDDEN_CATEGORY_IDS.includes(category.id) && !HIDDEN_CATEGORY_NAMES.has(category.name))
 
 const normalizePost = (post = {}, { includeContent = true } = {}) => {
   const embedded = post._embedded || {}
@@ -91,4 +94,4 @@ const normalizePost = (post = {}, { includeContent = true } = {}) => {
   }
 }
 
-module.exports = { normalizeCategories, normalizePost, sanitizeContentHtml, stripHtml }
+module.exports = { HIDDEN_CATEGORY_IDS, normalizeCategories, normalizePost, sanitizeContentHtml, stripHtml }

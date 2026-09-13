@@ -59,6 +59,8 @@ test('normalizeCategories 仅返回可用于筛选的类目', () => {
 
   const categories = normalizeCategories([
     { id: 7, name: '旅行' },
+    { id: 343, name: '昨年今日' },
+    { id: 398, name: '就是瞎拍' },
     { id: 'invalid', name: '不应显示' },
     { id: 9, name: '<em>摄影</em>' },
     { id: 11, name: '' }

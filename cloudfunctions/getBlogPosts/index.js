@@ -1,4 +1,4 @@
-const { normalizeCategories, normalizePost } = require('./blog-core')
+const { HIDDEN_CATEGORY_IDS, normalizeCategories, normalizePost } = require('./blog-core')
 
 const WORDPRESS_API_BASE = String(process.env.WORDPRESS_API_BASE || 'https://shengxiluo.me/wp-json/wp/v2').replace(/\/$/, '')
 const CACHE_TTL_MS = 5 * 60 * 1000
@@ -9,7 +9,7 @@ const fail = (code, message) => ({ ok: false, code, message })
 const buildListPath = ({ page, pageSize, categoryId } = {}) => {
   const selectedCategoryId = Number(categoryId)
   const categoryQuery = Number.isInteger(selectedCategoryId) && selectedCategoryId > 0 ? `&categories=${selectedCategoryId}` : ''
-  return `/posts?_embed=1&per_page=${pageSize}&page=${page}&orderby=date&order=desc${categoryQuery}`
+  return `/posts?_embed=1&per_page=${pageSize}&page=${page}&orderby=date&order=desc&categories_exclude=${HIDDEN_CATEGORY_IDS.join(',')}${categoryQuery}`
 }
 
 const fetchJson = async (path) => {
