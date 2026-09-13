@@ -1,19 +1,24 @@
 <view class="page">
   <view wx:if="{{profileLoading}}" class="state">正在确认登录状态…</view>
 
-  <view wx:elif="{{!authorized}}" class="login-card">
-    <view class="avatar placeholder-avatar">照</view>
-    <view class="login-title">登录后，收藏你的每一次创作</view>
-    <view class="login-copy">授权昵称和头像后，即可查看和管理自己的作品。</view>
-    <button class="authorize-button" loading="{{authorizing}}" disabled="{{authorizing}}" bindtap="authorizeProfile">微信授权登录</button>
+  <view wx:elif="{{!authorized}}" class="guest-profile">
+    <view class="profile-tap" bindtap="authorizeProfile">
+      <view class="avatar placeholder-avatar">照</view>
+      <view class="profile-info">
+        <view class="profile-name">点击授权登录</view>
+        <view class="profile-copy">点击头像或昵称，授权微信资料后查看作品。</view>
+      </view>
+    </view>
     <view class="privacy-copy">仅用于展示你的个人资料，不会公开你的作品。</view>
   </view>
 
   <block wx:else>
     <view class="profile">
-      <image wx:if="{{profile.avatarUrl}}" class="avatar" src="{{profile.avatarUrl}}" mode="aspectFill"></image>
-      <view wx:else class="avatar">照</view>
-      <view><view class="profile-name">{{profile.nickName || '我的创作'}}</view><view class="profile-copy">把此刻，好好留住。</view></view>
+      <view class="profile-tap" bindtap="authorizeProfile">
+        <image wx:if="{{profile.avatarUrl}}" class="avatar" src="{{profile.avatarUrl}}" mode="aspectFill"></image>
+        <view wx:else class="avatar">照</view>
+        <view class="profile-info"><view class="profile-name">{{profile.nickName || '我的创作'}}</view><view class="profile-copy">把此刻，好好留住。</view></view>
+      </view>
       <view class="settings" bindtap="openSettings">设置</view>
     </view>
 

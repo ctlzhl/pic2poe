@@ -7,7 +7,7 @@ page { background: #f8f7f2; }
 .eyebrow { font-size: 20rpx; letter-spacing: 4rpx; opacity: .86; }
 .title { margin-top: 22rpx; font-family: serif; font-size: 54rpx; font-weight: 600; line-height: 1.25; letter-spacing: 1rpx; }
 .subtitle { margin-top: 18rpx; font-size: 28rpx; opacity: .94; }
-.hero-button { width: 240rpx; height: 82rpx; margin: 38rpx 0 0; border-radius: 42rpx; background: #f7f3e9; color: #38543b; font-size: 28rpx; font-weight: 600; line-height: 82rpx; }
+.hero-button { display: flex; align-items: center; justify-content: center; width: 240rpx; height: 82rpx; margin: 38rpx 0 0; padding: 0; border-radius: 42rpx; background: #f7f3e9; color: #38543b; font-size: 28rpx; font-weight: 600; line-height: 1; }
 .hero-button::after { border: 0; }
 .ability-list { display: flex; justify-content: center; gap: 16rpx; margin: 34rpx 0 26rpx; color: #60715f; font-size: 24rpx; }
 .ability-dot { color: #9aa695; }
