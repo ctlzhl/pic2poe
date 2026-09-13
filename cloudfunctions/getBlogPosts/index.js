@@ -1,10 +1,16 @@
-const { normalizePost } = require('./blog-core')
+const { normalizeCategories, normalizePost } = require('./blog-core')
 
 const WORDPRESS_API_BASE = String(process.env.WORDPRESS_API_BASE || 'https://shengxiluo.me/wp-json/wp/v2').replace(/\/$/, '')
 const CACHE_TTL_MS = 5 * 60 * 1000
 const cache = new Map()
 
 const fail = (code, message) => ({ ok: false, code, message })
+
+const buildListPath = ({ page, pageSize, categoryId } = {}) => {
+  const selectedCategoryId = Number(categoryId)
+  const categoryQuery = Number.isInteger(selectedCategoryId) && selectedCategoryId > 0 ? `&categories=${selectedCategoryId}` : ''
+  return `/posts?_embed=1&per_page=${pageSize}&page=${page}&orderby=date&order=desc${categoryQuery}`
+}
 
 const fetchJson = async (path) => {
   const controller = new AbortController()
@@ -43,7 +49,7 @@ const withCache = async (key, request) => {
 }
 
 exports.main = async (event = {}) => {
-  const action = event.action === 'detail' ? 'detail' : 'list'
+  const action = event.action === 'detail' || event.action === 'categories' ? event.action : 'list'
   try {
     if (action === 'detail') {
       const postId = Number(event.postId)
@@ -52,9 +58,15 @@ exports.main = async (event = {}) => {
       return { ok: true, data: { post: normalizePost(result.data) } }
     }
 
+    if (action === 'categories') {
+      const result = await withCache('categories', () => fetchJson('/categories?per_page=100&hide_empty=true&orderby=count&order=desc'))
+      return { ok: true, data: { categories: normalizeCategories(result.data) } }
+    }
+
     const page = Math.max(1, Number(event.page) || 1)
     const pageSize = Math.min(10, Math.max(1, Number(event.pageSize) || 3))
-    const result = await withCache(`list:${page}:${pageSize}`, () => fetchJson(`/posts?_embed=1&per_page=${pageSize}&page=${page}&orderby=date&order=desc`))
+    const categoryId = Number.isInteger(Number(event.categoryId)) && Number(event.categoryId) > 0 ? Number(event.categoryId) : 0
+    const result = await withCache(`list:${page}:${pageSize}:${categoryId}`, () => fetchJson(buildListPath({ page, pageSize, categoryId })))
     return {
       ok: true,
       data: {
@@ -70,3 +82,5 @@ exports.main = async (event = {}) => {
     return fail('BLOG_UNAVAILABLE', '博客暂时无法加载，请稍后再试。')
   }
 }
+
+module.exports.buildListPath = buildListPath

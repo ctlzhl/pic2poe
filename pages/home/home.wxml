@@ -19,7 +19,7 @@
   </view>
 
   <view class="blog-head">
-    <view class="blog-title">博客文章</view>
+    <view class="blog-title">随便看看</view>
     <view class="more-link" bindtap="openBlogList">更多文章 ›</view>
   </view>
 

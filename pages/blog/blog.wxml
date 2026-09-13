@@ -1,4 +1,9 @@
 <view class="page">
+  <scroll-view class="category-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
+    <view class="category-tabs">
+      <view wx:for="{{categories}}" wx:key="id" class="category-chip {{selectedCategoryId === item.id ? 'is-active' : ''}}" data-category-id="{{item.id}}" bindtap="selectCategory">{{item.name}}</view>
+    </view>
+  </scroll-view>
   <view wx:if="{{loading && !posts.length}}" class="state">正在加载文章…</view>
   <view wx:elif="{{errorMessage && !posts.length}}" class="state"><view>{{errorMessage}}</view><view class="retry" bindtap="reload">重新加载</view></view>
   <view wx:else class="list">

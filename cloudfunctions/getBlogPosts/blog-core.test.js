@@ -52,3 +52,17 @@ test('sanitizeContentHtml 移除正文开头重复的全文摘要', () => {
 
   assert.equal(html, '<p>这里才是正文。</p>')
 })
+
+test('normalizeCategories 仅返回可用于筛选的类目', () => {
+  const { normalizeCategories } = loadCore()
+  assert.equal(typeof normalizeCategories, 'function')
+
+  const categories = normalizeCategories([
+    { id: 7, name: '旅行' },
+    { id: 'invalid', name: '不应显示' },
+    { id: 9, name: '<em>摄影</em>' },
+    { id: 11, name: '' }
+  ])
+
+  assert.deepEqual(categories, [{ id: 7, name: '旅行' }, { id: 9, name: '摄影' }])
+})

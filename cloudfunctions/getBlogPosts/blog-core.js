@@ -67,6 +67,13 @@ const getCategoryName = (embedded = {}) => {
   return String(terms[0]?.name || '').trim()
 }
 
+const normalizeCategories = (categories = []) => (Array.isArray(categories) ? categories : [])
+  .map((category) => ({
+    id: Number(category?.id) || 0,
+    name: stripInlineHtml(category?.name || '')
+  }))
+  .filter((category) => category.id > 0 && category.name)
+
 const normalizePost = (post = {}, { includeContent = true } = {}) => {
   const embedded = post._embedded || {}
   const media = Array.isArray(embedded['wp:featuredmedia']) ? embedded['wp:featuredmedia'][0] : null
@@ -84,4 +91,4 @@ const normalizePost = (post = {}, { includeContent = true } = {}) => {
   }
 }
 
-module.exports = { normalizePost, sanitizeContentHtml, stripHtml }
+module.exports = { normalizeCategories, normalizePost, sanitizeContentHtml, stripHtml }
