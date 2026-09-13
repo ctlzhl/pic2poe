@@ -36,3 +36,19 @@ test('normalizePost 清洗 WordPress HTML 并提取文章展示字段', () => {
     publishedAt: '2026-09-14T09:30:00'
   })
 })
+
+test('sanitizeContentHtml 让正文图片按容器宽度等比例展示', () => {
+  const { sanitizeContentHtml } = loadCore()
+  assert.equal(typeof sanitizeContentHtml, 'function')
+
+  const html = sanitizeContentHtml('<p>正文图片：</p><img src="https://cdn.example.com/article.jpg" alt="秋日湖面">')
+
+  assert.equal(html, '<p>正文图片：</p><img src="https://cdn.example.com/article.jpg" alt="秋日湖面" style="width:100%;height:auto;display:block;">')
+})
+
+test('sanitizeContentHtml 移除正文开头重复的全文摘要', () => {
+  const { sanitizeContentHtml } = loadCore()
+  const html = sanitizeContentHtml('<div class="summary-card"><span>全篇摘要</span><div>这段文字会由摘要卡展示。</div></div><p>这里才是正文。</p>')
+
+  assert.equal(html, '<p>这里才是正文。</p>')
+})

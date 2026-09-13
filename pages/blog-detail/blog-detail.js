@@ -20,6 +20,5 @@ Page({
       console.error('加载文章详情失败:', error)
       this.setData({ errorMessage: error.message || '文章暂时无法加载，请稍后再试。' })
     } finally { this.setData({ loading: false }) }
-  },
-  startCreation() { wx.switchTab({ url: '/pages/index/index' }) }
+  }
 })

@@ -5,7 +5,10 @@
     <image wx:if="{{post.featuredImage}}" class="hero" src="{{post.featuredImage}}" mode="aspectFill"></image>
     <view class="category">{{post.categoryName || '随笔'}} · {{post.publishedLabel}}</view>
     <view class="title">{{post.title}}</view>
+    <view wx:if="{{post.excerpt}}" class="summary-card">
+      <view class="summary-label">全文摘要</view>
+      <view class="summary-copy">{{post.excerpt}}</view>
+    </view>
     <rich-text class="content" nodes="{{post.contentHtml}}"></rich-text>
-    <button class="primary-button" bindtap="startCreation">上传照片开始创作</button>
   </block>
 </view>

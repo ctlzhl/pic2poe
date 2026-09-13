@@ -23,10 +23,21 @@ const safeUrl = (value = '') => {
   return /^https:\/\//i.test(url) ? url : ''
 }
 
+const removeLeadingSummary = (value = '') => {
+  const html = String(value)
+  const firstContentTag = html.search(/<(?:h[1-6]|p|ul|ol|blockquote|img)\b/i)
+  if (firstContentTag <= 0) return html
+
+  const leadingContent = stripHtml(html.slice(0, firstContentTag))
+  return leadingContent.includes('全文摘要') || leadingContent.includes('摘要') ? html.slice(firstContentTag) : html
+}
+
 const sanitizeContentHtml = (value = '') => {
   let html = String(value)
     .replace(/<!--([\s\S]*?)-->/g, '')
     .replace(/<(script|style|iframe|form)[^>]*>[\s\S]*?<\/\1>/gi, '')
+
+  html = removeLeadingSummary(html)
 
   html = html.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (match, rawTag, attributes = '') => {
     const tag = rawTag.toLowerCase()
@@ -42,7 +53,7 @@ const sanitizeContentHtml = (value = '') => {
       const src = (attributes.match(/\bsrc\s*=\s*["']([^"']*)["']/i) || [])[1]
       const alt = (attributes.match(/\balt\s*=\s*["']([^"']*)["']/i) || [])[1] || ''
       const safeSrc = safeUrl(src)
-      return safeSrc ? `<img src="${safeSrc}" alt="${stripHtml(alt)}">` : ''
+      return safeSrc ? `<img src="${safeSrc}" alt="${stripHtml(alt)}" style="width:100%;height:auto;display:block;">` : ''
     }
     return `<${tag}>`
   })
