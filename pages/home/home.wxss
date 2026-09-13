@@ -9,9 +9,10 @@ page { background: #f8f7f2; }
 .subtitle { margin-top: 18rpx; font-size: 28rpx; opacity: .94; }
 .hero-button { display: flex; align-items: center; justify-content: center; width: 240rpx; height: 82rpx; margin: 38rpx 0 0; padding: 0; border-radius: 42rpx; background: #f7f3e9; color: #38543b; font-size: 28rpx; font-weight: 600; line-height: 1; }
 .hero-button::after { border: 0; }
-.ability-list { display: flex; justify-content: center; gap: 16rpx; margin: 34rpx 0 26rpx; color: #60715f; font-size: 24rpx; }
-.ability-dot { color: #9aa695; }
-.intro-copy { padding: 0 22rpx; color: #6e756b; font-size: 27rpx; line-height: 1.75; text-align: center; }
+.creation-guide { display: flex; align-items: center; justify-content: center; gap: 14rpx; margin: 38rpx 0 16rpx; color: #60715f; font-size: 25rpx; white-space: nowrap; }
+.guide-step { display: flex; align-items: center; gap: 8rpx; }
+.guide-index { display: flex; width: 32rpx; height: 32rpx; align-items: center; justify-content: center; border-radius: 50%; background: #e0e7da; color: #52704f; font-size: 20rpx; }
+.guide-arrow { color: #9aa695; font-size: 34rpx; font-weight: 300; line-height: 1; }
 .blog-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 68rpx; margin-bottom: 28rpx; }
 .blog-title { font-family: serif; font-size: 40rpx; font-weight: 600; }.more-link, .retry-link { color: #4f704f; font-size: 26rpx; }
 .blog-state { padding: 52rpx 20rpx; color: #7c8578; font-size: 27rpx; text-align: center; }.retry-link { margin-top: 18rpx; }

@@ -10,15 +10,13 @@
     </view>
   </view>
 
-  <view class="ability-list">
-    <view class="ability">五言绝句</view>
-    <view class="ability-dot">·</view>
-    <view class="ability">图片点评</view>
-    <view class="ability-dot">·</view>
-    <view class="ability">配图文案</view>
+  <view class="creation-guide">
+    <view class="guide-step"><view class="guide-index">1</view><view>上传照片</view></view>
+    <view class="guide-arrow">›</view>
+    <view class="guide-step"><view class="guide-index">2</view><view>选择创作</view></view>
+    <view class="guide-arrow">›</view>
+    <view class="guide-step"><view class="guide-index">3</view><view>收获文字</view></view>
   </view>
-
-  <view class="intro-copy">上传一张照片，把那一刻写成一首诗、一段图评，或一句适合分享的话。</view>
 
   <view class="blog-head">
     <view class="blog-title">博客文章</view>
