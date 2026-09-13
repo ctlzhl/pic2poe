@@ -1,23 +1,36 @@
 <view class="page">
-  <view class="profile">
-    <view class="avatar">照</view>
-    <view><view class="profile-name">我的创作</view><view class="profile-copy">把此刻，好好留住。</view></view>
-    <view class="settings" bindtap="openSettings">设置</view>
+  <view wx:if="{{profileLoading}}" class="state">正在确认登录状态…</view>
+
+  <view wx:elif="{{!authorized}}" class="login-card">
+    <view class="avatar placeholder-avatar">照</view>
+    <view class="login-title">登录后，收藏你的每一次创作</view>
+    <view class="login-copy">授权昵称和头像后，即可查看和管理自己的作品。</view>
+    <button class="authorize-button" loading="{{authorizing}}" disabled="{{authorizing}}" bindtap="authorizeProfile">微信授权登录</button>
+    <view class="privacy-copy">仅用于展示你的个人资料，不会公开你的作品。</view>
   </view>
 
-  <view wx:if="{{loading}}" class="state">正在整理作品…</view>
-  <view wx:elif="{{errorMessage}}" class="state"><view>{{errorMessage}}</view><button class="text-button" bindtap="loadRecentWorks">重新加载</button></view>
-  <view wx:elif="{{!works.length}}" class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="primary-button" bindtap="startCreation">开始创作</button></view>
   <block wx:else>
-    <view class="section-head"><view>我的作品（{{totalWorks}}）</view><view class="all-link" bindtap="openAllWorks">查看全部</view></view>
-    <view class="grid">
-      <view wx:for="{{works}}" wx:key="workId" class="card" data-work-id="{{item.workId}}" bindtap="openWork">
-        <image wx:if="{{item.thumbnailUrl}}" class="thumb" src="{{item.thumbnailUrl}}" mode="aspectFill"></image>
-        <view wx:else class="thumb placeholder">照片</view>
-        <view class="card-type">{{item.typeTitle}}</view>
-        <view class="card-title">{{item.title}}</view>
-        <view class="card-date">{{item.createdLabel}}</view>
-      </view>
+    <view class="profile">
+      <image wx:if="{{profile.avatarUrl}}" class="avatar" src="{{profile.avatarUrl}}" mode="aspectFill"></image>
+      <view wx:else class="avatar">照</view>
+      <view><view class="profile-name">{{profile.nickName || '我的创作'}}</view><view class="profile-copy">把此刻，好好留住。</view></view>
+      <view class="settings" bindtap="openSettings">设置</view>
     </view>
+
+    <view wx:if="{{loading}}" class="state">正在整理作品…</view>
+    <view wx:elif="{{errorMessage}}" class="state"><view>{{errorMessage}}</view><button class="text-button" bindtap="loadRecentWorks">重新加载</button></view>
+    <view wx:elif="{{!works.length}}" class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="primary-button" bindtap="startCreation">开始创作</button></view>
+    <block wx:else>
+      <view class="section-head"><view>我的作品（{{totalWorks}}）</view><view class="all-link" bindtap="openAllWorks">查看全部</view></view>
+      <view class="grid">
+        <view wx:for="{{works}}" wx:key="workId" class="card" data-work-id="{{item.workId}}" bindtap="openWork">
+          <image wx:if="{{item.thumbnailUrl}}" class="thumb" src="{{item.thumbnailUrl}}" mode="aspectFill"></image>
+          <view wx:else class="thumb placeholder">照片</view>
+          <view class="card-type">{{item.typeTitle}}</view>
+          <view class="card-title">{{item.title}}</view>
+          <view class="card-date">{{item.createdLabel}}</view>
+        </view>
+      </view>
+    </block>
   </block>
 </view>

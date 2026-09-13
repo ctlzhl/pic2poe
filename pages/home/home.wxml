@@ -1,21 +1,45 @@
 <view class="page">
-  <view class="hero">
-    <view class="eyebrow">照片有话说</view>
-    <view class="title">把此刻，写下来</view>
-    <view class="subtitle">一张照片，三种表达。</view>
+  <view class="hero-card">
+    <image class="hero-image" src="/assets/images/home-hero-v1.jpg" mode="aspectFill"></image>
+    <view class="hero-shade"></view>
+    <view class="hero-content">
+      <view class="eyebrow">TRAVEL · WORDS · MEMORY</view>
+      <view class="title">让一张照片，<br/>长出诗和回忆。</view>
+      <view class="subtitle">从光影里，找一句话。</view>
+      <button class="hero-button" bindtap="startCreation">开始创作</button>
+    </view>
   </view>
 
-  <view class="intro-card">
-    <view class="intro-title">让照片有一句自己的话</view>
-    <view class="intro-copy">上传照片后，可以写成一首五言绝句、一段图片点评，或一条配图文案。</view>
-    <button class="primary-button" bindtap="startCreation">开始创作</button>
+  <view class="ability-list">
+    <view class="ability">五言绝句</view>
+    <view class="ability-dot">·</view>
+    <view class="ability">图片点评</view>
+    <view class="ability-dot">·</view>
+    <view class="ability">配图文案</view>
   </view>
 
-  <view class="step-list">
-    <view class="step"><text>1</text><view><view>选择一张照片</view><view class="muted">支持 JPG、PNG、WebP</view></view></view>
-    <view class="step"><text>2</text><view><view>选一种表达</view><view class="muted">诗、图评或文案</view></view></view>
-    <view class="step"><text>3</text><view><view>保存或分享作品</view><view class="muted">每一刻都值得留下一种说法</view></view></view>
+  <view class="intro-copy">上传一张照片，把那一刻写成一首诗、一段图评，或一句适合分享的话。</view>
+
+  <view class="blog-head">
+    <view class="blog-title">博客文章</view>
+    <view class="more-link" bindtap="openBlogList">更多文章 ›</view>
   </view>
 
-  <button class="text-button" bindtap="openMyWorks">查看我的作品</button>
+  <view wx:if="{{blogLoading}}" class="blog-state">正在加载文章…</view>
+  <view wx:elif="{{blogError}}" class="blog-state">
+    <view>{{blogError}}</view>
+    <view class="retry-link" bindtap="loadLatestPosts">重新加载</view>
+  </view>
+  <view wx:elif="{{!posts.length}}" class="blog-state">暂时没有可展示的文章。</view>
+  <view wx:else class="post-list">
+    <view wx:for="{{posts}}" wx:key="id" class="post-card" data-post-id="{{item.id}}" bindtap="openPost">
+      <image wx:if="{{item.featuredImage}}" class="post-cover" src="{{item.featuredImage}}" mode="aspectFill"></image>
+      <view wx:else class="post-cover placeholder"></view>
+      <view class="post-body">
+        <view class="post-meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>
+        <view class="post-title">{{item.title}}</view>
+        <view class="post-excerpt">{{item.excerpt}}</view>
+      </view>
+    </view>
+  </view>
 </view>

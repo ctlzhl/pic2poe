@@ -1,0 +1,16 @@
+<view class="page">
+  <view wx:if="{{loading && !posts.length}}" class="state">正在加载文章…</view>
+  <view wx:elif="{{errorMessage && !posts.length}}" class="state"><view>{{errorMessage}}</view><view class="retry" bindtap="reload">重新加载</view></view>
+  <view wx:else class="list">
+    <view wx:for="{{posts}}" wx:key="id" class="post" data-post-id="{{item.id}}" bindtap="openPost">
+      <image wx:if="{{item.featuredImage}}" class="cover" src="{{item.featuredImage}}" mode="aspectFill"></image>
+      <view wx:else class="cover placeholder"></view>
+      <view class="meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>
+      <view class="title">{{item.title}}</view>
+      <view class="excerpt">{{item.excerpt}}</view>
+    </view>
+    <view wx:if="{{loading}}" class="footer">正在加载…</view>
+    <view wx:elif="{{!hasMore}}" class="footer">没有更多文章。</view>
+    <view wx:else class="footer more" bindtap="loadMore">加载更多</view>
+  </view>
+</view>

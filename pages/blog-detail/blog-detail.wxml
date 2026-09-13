@@ -1,0 +1,11 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在打开文章…</view>
+  <view wx:elif="{{errorMessage}}" class="state"><view>{{errorMessage}}</view><view class="retry" bindtap="loadPost">重新加载</view></view>
+  <block wx:else>
+    <image wx:if="{{post.featuredImage}}" class="hero" src="{{post.featuredImage}}" mode="aspectFill"></image>
+    <view class="category">{{post.categoryName || '随笔'}} · {{post.publishedLabel}}</view>
+    <view class="title">{{post.title}}</view>
+    <rich-text class="content" nodes="{{post.contentHtml}}"></rich-text>
+    <button class="primary-button" bindtap="startCreation">上传照片开始创作</button>
+  </block>
+</view>

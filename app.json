@@ -2,6 +2,8 @@
 {
   "pages": [
     "pages/home/home",
+    "pages/blog/blog",
+    "pages/blog-detail/blog-detail",
     "pages/index/index",
     "pages/my/my",
     "pages/works/works",
