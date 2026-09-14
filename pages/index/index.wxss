@@ -23,7 +23,7 @@ page { background: #f8f7f2; color: #20251f; }
 .primary-button { margin: 0; background: #4a684c; color: #fff; box-shadow: 0 12rpx 28rpx rgba(48, 80, 51, 0.24); }
 .primary-button[disabled] { background: #aeb8aa; color: #edf0ea; }
 .creation-form { padding-bottom: 136rpx; }
-.creation-action-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom)); box-sizing: border-box; background: rgba(248, 247, 242, 0.98); box-shadow: 0 -10rpx 26rpx rgba(48, 56, 43, 0.08); }
+.creation-action-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; padding: 16rpx 32rpx 12rpx; box-sizing: border-box; background: rgba(248, 247, 242, 0.98); box-shadow: 0 -10rpx 26rpx rgba(48, 56, 43, 0.08); }
 .section { margin-top: 36rpx; }
 .compact-section { margin-top: 32rpx; }
 .section-label { margin-bottom: 18rpx; color: #31382e; font-size: 28rpx; font-weight: 600; }
