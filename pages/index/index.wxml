@@ -58,6 +58,9 @@
       </view>
     </view>
 
+  </view>
+
+  <view wx:if="{{assetId}}" class="creation-action-bar">
     <button class="primary-button" loading="{{submitting}}" disabled="{{preparing || submitting || !assetId}}" bindtap="startCreation">开始生成</button>
   </view>
 </view>
