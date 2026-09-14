@@ -17,6 +17,7 @@
 
     <button wx:if="{{status === 'failed'}}" class="primary-button" loading="{{retrying}}" bindtap="retry">重新生成</button>
     <button wx:if="{{status === 'failed'}}" class="secondary-button" bindtap="backToCreate">返回创作页</button>
+    <view wx:if="{{status === 'succeeded'}}" class="success-countdown">{{countdown}} 秒后自动查看结果</view>
     <button wx:if="{{status === 'succeeded'}}" class="primary-button" bindtap="goResult">查看结果</button>
   </view>
 </view>

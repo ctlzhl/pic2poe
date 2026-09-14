@@ -3,6 +3,7 @@ const { showErrorToast } = require('../../utils/errorHandler')
 
 const POLL_INTERVAL = 2000
 const RUN_TIMEOUT = 65000
+const SUCCESS_COUNTDOWN_SECONDS = 3
 const STATUS_TEXT = {
   queued: '已收到，正在排队创作',
   analyzing: '正在读懂照片里的画面',
@@ -20,7 +21,8 @@ Page({
     attemptNumber: 1,
     workId: '',
     errorMessage: '',
-    retrying: false
+    retrying: false,
+    countdown: SUCCESS_COUNTDOWN_SECONDS
   },
 
   onLoad(options) {
@@ -37,6 +39,7 @@ Page({
 
   onUnload() {
     this.stopPolling()
+    this.stopSuccessCountdown()
   },
 
   onHide() {
@@ -82,8 +85,11 @@ Page({
         attemptNumber: task.attemptNumber || 1,
         workId: task.workId || '',
         errorMessage: task.errorMessage || ''
+      }, () => {
+        if (status === 'failed' || status === 'succeeded') this.stopPolling()
+        if (status === 'failed') this.stopSuccessCountdown()
+        if (status === 'succeeded') this.startSuccessCountdown()
       })
-      if (status === 'failed' || status === 'succeeded') this.stopPolling()
     } catch (error) {
       console.error('轮询创作任务失败:', error)
     } finally {
@@ -110,6 +116,7 @@ Page({
     try {
       const response = await callFunctionWithTimeout('retryCreation', { taskId: this.data.taskId })
       if (!response.result?.ok) throw new Error(response.result?.message || '重新创作失败')
+      this.stopSuccessCountdown()
       this.setData({ status: 'queued', statusText: STATUS_TEXT.queued, errorMessage: '' })
       this.startPolling()
       this.requestRun()
@@ -125,8 +132,34 @@ Page({
     wx.navigateBack({ delta: 1 })
   },
 
+  stopSuccessCountdown() {
+    if (this.successTimer) clearTimeout(this.successTimer)
+    this.successTimer = null
+    this.successCountdownStarted = false
+  },
+
+  startSuccessCountdown() {
+    if (this.successCountdownStarted || !this.data.workId) return
+    this.successCountdownStarted = true
+    this.setData({ countdown: SUCCESS_COUNTDOWN_SECONDS })
+
+    const tick = () => {
+      const countdown = this.data.countdown - 1
+      if (countdown <= 0) {
+        this.successTimer = null
+        this.goResult()
+        return
+      }
+      this.setData({ countdown })
+      this.successTimer = setTimeout(tick, 1000)
+    }
+
+    this.successTimer = setTimeout(tick, 1000)
+  },
+
   goResult() {
     if (!this.data.workId) return
+    this.stopSuccessCountdown()
     wx.redirectTo({ url: `/pages/result/result?workId=${this.data.workId}&fresh=1` })
   }
 })
