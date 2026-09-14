@@ -3,15 +3,17 @@
     <view class="eyebrow">照片有话说</view>
     <view class="title">把此刻，写下来</view>
     <view class="subtitle">上传一张照片，选择你想听见的话。</view>
-    <view class="works-link" bindtap="goWorks">前往我的作品 →</view>
   </view>
 
   <view class="image-card" bindtap="chooseImage">
     <image wx:if="{{imageUrl}}" class="preview" src="{{imageUrl}}" mode="aspectFit"></image>
     <view wx:else class="image-empty">
-      <view class="empty-icon">◌</view>
-      <view class="empty-title">选择一张照片</view>
-      <view class="empty-desc">支持 JPG、PNG、WebP，最大 6MB</view>
+      <image class="empty-background" src="/assets/images/creation-upload-v1.jpg" mode="aspectFill"></image>
+      <view class="empty-content">
+        <view class="empty-icon">◌</view>
+        <view class="empty-title">选择一张照片</view>
+        <view class="empty-desc">支持 JPG、PNG、WebP，最大 6MB</view>
+      </view>
     </view>
     <view wx:if="{{preparing}}" class="image-status">正在优化图片…</view>
     <view wx:elif="{{prepareState === 'ready'}}" class="image-status ready">图片已准备好</view>

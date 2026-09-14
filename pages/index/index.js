@@ -64,10 +64,6 @@ Page({
     })
   },
 
-  goWorks() {
-    wx.switchTab({ url: '/pages/my/my' })
-  },
-
   async chooseImage() {
     if (this.data.preparing || this.data.submitting) return
 
