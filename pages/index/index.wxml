@@ -9,8 +9,9 @@
     <image wx:if="{{imageUrl}}" class="preview" src="{{imageUrl}}" mode="aspectFit"></image>
     <view wx:else class="image-empty">
       <image class="empty-background" src="/assets/images/creation-upload-v1.jpg" mode="aspectFill"></image>
+      <view class="empty-overlay"></view>
       <view class="empty-content">
-        <view class="empty-icon">◌</view>
+        <view class="empty-icon">＋</view>
         <view class="empty-title">选择一张照片</view>
         <view class="empty-desc">支持 JPG、PNG、WebP，最大 6MB</view>
       </view>
