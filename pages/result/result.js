@@ -1,4 +1,4 @@
-const { callFunctionWithTimeout, downloadFileWithTimeout, saveToAlbumWithTimeout } = require('../../utils/requestHelper')
+const { callFunctionWithTimeout, downloadFileWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
 
 const SHARE_TIMEOUT = 55000
@@ -29,8 +29,7 @@ Page({
     shareTitle: '照片有话说',
     shareImageUrl: '',
     shareLoading: false,
-    shareError: '',
-    sharePanelVisible: false
+    shareError: ''
   },
 
   onLoad(options) {
@@ -117,20 +116,6 @@ Page({
     }
   },
 
-  retryShareCard() {
-    this.prepareShareCard()
-  },
-
-  openSharePanel() {
-    this.setData({ sharePanelVisible: true })
-  },
-
-  closeSharePanel() {
-    this.setData({ sharePanelVisible: false })
-  },
-
-  preventBubble() {},
-
   async getShareImageTempPath() {
     if (this.shareImageTempPath) return this.shareImageTempPath
     if (!this.data.shareImageUrl) throw new Error('分享图正在生成，请稍候')
@@ -143,38 +128,23 @@ Page({
     return this.shareImageTempPath
   },
 
-  async saveShareImage() {
-    wx.showLoading({ title: '正在保存…', mask: true })
-    try {
-      const tempFilePath = await this.getShareImageTempPath()
-      await saveToAlbumWithTimeout(tempFilePath)
-      wx.showToast({ title: '已保存到相册', icon: 'success' })
-    } catch (error) {
-      console.error('保存分享图失败:', error)
-      showErrorToast(error, '保存失败，请允许访问相册后重试。')
-    } finally {
-      wx.hideLoading()
-    }
-  },
-
-  showShareTimelineHint() {
-    if (!this.data.shareToken) {
-      this.prepareShareCard()
-      wx.showToast({ title: '正在生成分享图，请稍候', icon: 'none' })
+  async openNativeShareMenu() {
+    if (!this.data.shareImageUrl) {
+      if (!this.data.shareLoading) {
+        this.prepareShareCard()
+      }
+      wx.showToast({ title: '分享图正在准备，请稍候', icon: 'none' })
       return
     }
-    wx.showToast({ title: '请从右上角菜单选择分享到朋友圈', icon: 'none', duration: 2800 })
-  },
 
-  async shareAsSticker() {
-    wx.showLoading({ title: '正在准备…', mask: true })
+    wx.showLoading({ title: '正在打开…', mask: true })
     try {
       const tempFilePath = await this.getShareImageTempPath()
-      if (typeof wx.showShareImageMenu !== 'function') throw new Error('当前微信版本暂不支持图片转发')
+      if (typeof wx.showShareImageMenu !== 'function') throw new Error('当前微信版本暂不支持图片分享')
       wx.showShareImageMenu({ path: tempFilePath })
     } catch (error) {
-      console.error('转发分享图失败:', error)
-      showErrorToast(error, '转发为贴图失败，请更新微信后重试。')
+      console.error('打开原生图片分享菜单失败:', error)
+      showErrorToast(error, '打开图片分享菜单失败，请更新微信后重试。')
     } finally {
       wx.hideLoading()
     }

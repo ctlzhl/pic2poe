@@ -6,7 +6,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const CANVAS_WIDTH = 1440
 const CANVAS_HEIGHT = 1800
-const TEMPLATE_VERSION = 'share-v1'
+const TEMPLATE_VERSION = 'share-v2'
+const CARD_TOP_GAP = 48
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
 let wechatAccessTokenCache = null
@@ -191,19 +192,19 @@ const renderPoemCard = async (work, source, metadata, qr) => {
     return compose(photo, { left: 0, top: 780 }, textSvg, qr, { left: 1180, top: 540 })
   }
 
-  const photo = await renderPhoto(source, 780, CANVAS_HEIGHT)
+  const photo = await renderPhoto(source, 780, CANVAS_HEIGHT - CARD_TOP_GAP)
   const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
     <rect x="780" y="0" width="660" height="${CANVAS_HEIGHT}" fill="#f7f1e7"/>
     ${svgText(wrapText(title, 8, 2), { x: 850, y: 164, fontSize: 58, lineHeight: 78, fill: '#263426', weight: 700, family })}
     ${svgText(lines, { x: 850, y: 410, fontSize: 48, lineHeight: 90, fill: '#3c493b', family })}
   </svg>`
-  return compose(photo, { left: 0, top: 0 }, textSvg, qr, { left: 1218, top: 1580 })
+  return compose(photo, { left: 0, top: CARD_TOP_GAP }, textSvg, qr, { left: 1218, top: 1580 })
 }
 
 const renderEditorialCard = async (work, source, qr) => {
   const isReview = work.type === 'review'
   const photoHeight = isReview ? 1040 : 900
-  const photo = await renderPhoto(source, CANVAS_WIDTH, photoHeight)
+  const photo = await renderPhoto(source, CANVAS_WIDTH, photoHeight - CARD_TOP_GAP)
   const headline = isReview ? work.content?.review?.headline : work.content?.copy?.headline
   const body = isReview ? work.content?.review?.body : work.content?.copy?.body
   const label = isReview ? '图片点评' : (work.content?.copy?.label || '配图文案')
@@ -219,7 +220,7 @@ const renderEditorialCard = async (work, source, qr) => {
     ${svgText(bodyLines, { x: 84, y: textTop + 86 + titleLines.length * 68 + 48, fontSize: 32, lineHeight: 50, fill: '#526052' })}
     ${svgText(tagLine ? [tagLine] : [], { x: 84, y: 1710, fontSize: 26, lineHeight: 34, fill: '#74826f' })}
   </svg>`
-  return compose(photo, { left: 0, top: 0 }, textSvg, qr, { left: 1206, top: 1600 })
+  return compose(photo, { left: 0, top: CARD_TOP_GAP }, textSvg, qr, { left: 1206, top: 1600 })
 }
 
 const getWxaCode = async (shareToken) => {

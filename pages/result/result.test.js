@@ -31,14 +31,27 @@ function createPage(definition, data = {}) {
   return page
 }
 
-test('点击保存分享会打开已就绪的分享成品图浮层', () => {
+test('点击保存分享会直接打开已就绪图片的原生分享菜单', async () => {
   const definition = loadPageDefinition()
   const page = createPage(definition, {
     shareImageUrl: 'https://example.com/share-card.jpg'
   })
+  page.shareImageTempPath = '/tmp/share-card.jpg'
+  const originalWx = global.wx
+  let shownPath = ''
+  global.wx = {
+    showLoading() {},
+    hideLoading() {},
+    showShareImageMenu({ path }) {
+      shownPath = path
+    }
+  }
 
-  page.openSharePanel()
-
-  assert.equal(page.data.sharePanelVisible, true)
-  assert.equal(page.data.shareImageUrl, 'https://example.com/share-card.jpg')
+  try {
+    await page.openNativeShareMenu()
+    assert.equal(shownPath, '/tmp/share-card.jpg')
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
 })

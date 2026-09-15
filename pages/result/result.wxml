@@ -28,35 +28,15 @@
       <view class="tag-list"><text wx:for="{{work.content.copy.hashtags}}" wx:key="*this" class="tag">{{item}}</text></view>
     </view>
 
-    <view wx:if="{{!isShared}}" class="actions">
-      <button class="secondary-button" bindtap="rewriteSameImage">重新创作</button>
-      <button class="secondary-button" bindtap="createAgain">换图再写</button>
-      <button class="primary-button" bindtap="openSharePanel">保存分享</button>
+    <view wx:if="{{!isShared}}" class="actions action-grid">
+      <button class="action-button" bindtap="rewriteSameImage">重新创作</button>
+      <button class="action-button" bindtap="createAgain">换图再写</button>
+      <button class="action-button share-button" bindtap="openNativeShareMenu">保存分享</button>
     </view>
 
     <view wx:else class="actions">
       <button class="primary-button" bindtap="createAgain">我也要创作</button>
     </view>
 
-    <view wx:if="{{sharePanelVisible}}" class="share-panel-mask" bindtap="closeSharePanel">
-      <view class="share-panel" catchtap="preventBubble">
-        <view class="share-panel-head">
-          <view class="share-panel-title">分享成品图</view>
-          <button class="share-panel-close" bindtap="closeSharePanel">关闭</button>
-        </view>
-
-        <image wx:if="{{shareImageUrl}}" class="share-panel-image" src="{{shareImageUrl}}" mode="widthFix" show-menu-by-longpress></image>
-        <view wx:elif="{{shareLoading}}" class="share-panel-state">分享图正在准备中…</view>
-        <view wx:else class="share-panel-state">{{shareError || '分享图暂不可用，请稍后重试。'}}</view>
-        <button wx:if="{{!shareImageUrl && !shareLoading}}" class="share-panel-retry" bindtap="retryShareCard">重新生成分享图</button>
-
-        <view class="share-options">
-          <button class="share-option" open-type="share">发送给朋友</button>
-          <button class="share-option" bindtap="showShareTimelineHint">分享到朋友圈</button>
-          <button class="share-option" bindtap="saveShareImage">保存图片</button>
-          <button class="share-option" bindtap="shareAsSticker">转发为贴图</button>
-        </view>
-      </view>
-    </view>
   </view>
 </view>
