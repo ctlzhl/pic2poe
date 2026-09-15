@@ -1,0 +1,5 @@
+<view class="bottom-nav">
+  <navigator class="bottom-nav-item {{active === 'home' ? 'is-active' : ''}}" url="/pages/home/home" open-type="switchTab">首页</navigator>
+  <navigator class="bottom-nav-item {{active === 'create' ? 'is-active' : ''}}" url="/pages/index/index" open-type="switchTab">创作</navigator>
+  <navigator class="bottom-nav-item {{active === 'my' ? 'is-active' : ''}}" url="/pages/my/my" open-type="switchTab">我的</navigator>
+</view>

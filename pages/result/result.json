@@ -1,4 +1,6 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "bottom-nav": "/components/bottom-nav/index"
+  },
   "navigationBarTitleText": "创作结果"
 }

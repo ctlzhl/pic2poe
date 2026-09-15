@@ -39,4 +39,5 @@
     </view>
 
   </view>
+  <bottom-nav active="create"></bottom-nav>
 </view>

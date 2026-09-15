@@ -42,8 +42,9 @@ test('点击保存分享会直接打开已就绪图片的原生分享菜单', as
   global.wx = {
     showLoading() {},
     hideLoading() {},
-    showShareImageMenu({ path }) {
+    showShareImageMenu({ path, success }) {
       shownPath = path
+      success()
     }
   }
 
@@ -51,6 +52,37 @@ test('点击保存分享会直接打开已就绪图片的原生分享菜单', as
     await page.openNativeShareMenu()
     assert.equal(shownPath, '/tmp/share-card.jpg')
   } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})
+
+test('原生图片分享菜单调用失败时提示在真机预览中重试', async () => {
+  const definition = loadPageDefinition()
+  const page = createPage(definition, {
+    shareImageUrl: 'https://example.com/share-card.jpg'
+  })
+  page.shareImageTempPath = '/tmp/share-card.jpg'
+  const originalWx = global.wx
+  const originalConsoleError = console.error
+  let toastTitle = ''
+  global.wx = {
+    showLoading() {},
+    hideLoading() {},
+    showShareImageMenu({ fail }) {
+      fail({ errMsg: 'showShareImageMenu:fail not supported in devtools' })
+    },
+    showToast({ title }) {
+      toastTitle = title
+    }
+  }
+
+  try {
+    console.error = () => {}
+    await page.openNativeShareMenu()
+    assert.equal(toastTitle, '图片分享暂不可用，请在真机预览中重试。')
+  } finally {
+    console.error = originalConsoleError
     if (originalWx === undefined) delete global.wx
     else global.wx = originalWx
   }

@@ -20,4 +20,5 @@
     <view wx:if="{{status === 'succeeded'}}" class="success-countdown">{{countdown}} 秒后自动查看结果</view>
     <button wx:if="{{status === 'succeeded'}}" class="primary-button" bindtap="goResult">查看结果</button>
   </view>
+  <bottom-nav active="create"></bottom-nav>
 </view>

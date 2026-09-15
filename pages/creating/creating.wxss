@@ -1,7 +1,7 @@
 page { min-height: 100%; background: #f2f4ec; color: #253025; }
 .page { min-height: 100vh; overflow: hidden; position: relative; }
 .orb { position: absolute; top: -220rpx; right: -170rpx; width: 620rpx; height: 620rpx; border-radius: 50%; background: #dce8d6; opacity: .75; }
-.content { position: relative; padding: 180rpx 56rpx 80rpx; text-align: center; }
+.content { position: relative; padding: 180rpx 56rpx 184rpx; text-align: center; }
 .eyebrow { color: #72806d; font-size: 24rpx; letter-spacing: 5rpx; }
 .title { margin-top: 28rpx; font-family: serif; font-size: 64rpx; font-weight: 600; }
 .status-copy { margin: 22rpx auto 0; max-width: 500rpx; color: #6d756c; font-size: 30rpx; line-height: 1.6; }

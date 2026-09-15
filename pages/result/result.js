@@ -141,10 +141,16 @@ Page({
     try {
       const tempFilePath = await this.getShareImageTempPath()
       if (typeof wx.showShareImageMenu !== 'function') throw new Error('当前微信版本暂不支持图片分享')
-      wx.showShareImageMenu({ path: tempFilePath })
+      await new Promise((resolve, reject) => {
+        wx.showShareImageMenu({
+          path: tempFilePath,
+          success: resolve,
+          fail: (error) => reject(new Error(error?.errMsg || '图片分享菜单暂不可用'))
+        })
+      })
     } catch (error) {
       console.error('打开原生图片分享菜单失败:', error)
-      showErrorToast(error, '打开图片分享菜单失败，请更新微信后重试。')
+      showErrorToast(error, '图片分享暂不可用，请在真机预览中重试。')
     } finally {
       wx.hideLoading()
     }
