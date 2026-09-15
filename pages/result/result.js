@@ -23,7 +23,6 @@ Page({
     errorMessage: '',
     work: null,
     workId: '',
-    isFresh: false,
     typeTitle: '',
     isShared: false,
     shareToken: '',
@@ -31,7 +30,7 @@ Page({
     shareImageUrl: '',
     shareLoading: false,
     shareError: '',
-    deleting: false
+    sharePanelVisible: false
   },
 
   onLoad(options) {
@@ -51,7 +50,6 @@ Page({
       this.setData({ loading: false, hasError: true, errorMessage: '未获取到作品，请返回重试。' })
       return
     }
-    this.setData({ isFresh: options.fresh === '1' })
     this.loadWork(workId)
   },
 
@@ -110,6 +108,7 @@ Page({
         shareImageUrl: share.shareImageUrl,
         shareTitle: share.shareTitle || '照片有话说'
       })
+      this.shareImageTempPath = ''
     } catch (error) {
       console.error('生成分享图失败:', error)
       this.setData({ shareError: error.message || '分享图生成失败，请重试。' })
@@ -122,18 +121,33 @@ Page({
     this.prepareShareCard()
   },
 
-  async saveShareImage() {
-    if (!this.data.shareImageUrl) {
-      wx.showToast({ title: '分享图正在生成，请稍候', icon: 'none' })
-      return
+  openSharePanel() {
+    this.setData({ sharePanelVisible: true })
+  },
+
+  closeSharePanel() {
+    this.setData({ sharePanelVisible: false })
+  },
+
+  preventBubble() {},
+
+  async getShareImageTempPath() {
+    if (this.shareImageTempPath) return this.shareImageTempPath
+    if (!this.data.shareImageUrl) throw new Error('分享图正在生成，请稍候')
+
+    const download = await downloadFileWithTimeout(this.data.shareImageUrl)
+    if (download.statusCode && (download.statusCode < 200 || download.statusCode >= 300)) {
+      throw new Error('分享图下载失败')
     }
+    this.shareImageTempPath = download.tempFilePath
+    return this.shareImageTempPath
+  },
+
+  async saveShareImage() {
     wx.showLoading({ title: '正在保存…', mask: true })
     try {
-      const download = await downloadFileWithTimeout(this.data.shareImageUrl)
-      if (download.statusCode && (download.statusCode < 200 || download.statusCode >= 300)) {
-        throw new Error('分享图下载失败')
-      }
-      await saveToAlbumWithTimeout(download.tempFilePath)
+      const tempFilePath = await this.getShareImageTempPath()
+      await saveToAlbumWithTimeout(tempFilePath)
       wx.showToast({ title: '已保存到相册', icon: 'success' })
     } catch (error) {
       console.error('保存分享图失败:', error)
@@ -152,27 +166,17 @@ Page({
     wx.showToast({ title: '请从右上角菜单选择分享到朋友圈', icon: 'none', duration: 2800 })
   },
 
-  async deleteWork() {
-    if (this.data.isShared || this.data.deleting || !this.data.workId) return
-    const confirmation = await new Promise((resolve) => wx.showModal({
-      title: '删除这份作品？',
-      content: '关联图片、分享图和分享链接都会失效，且无法恢复。',
-      confirmText: '删除',
-      confirmColor: '#b65a4d',
-      success: resolve
-    }))
-    if (!confirmation.confirm) return
-
-    this.setData({ deleting: true })
+  async shareAsSticker() {
+    wx.showLoading({ title: '正在准备…', mask: true })
     try {
-      const response = await callFunctionWithTimeout('deleteWork', { workId: this.data.workId })
-      if (!response.result?.ok) throw new Error(response.result?.message || '删除作品失败')
-      wx.showToast({ title: '作品已删除', icon: 'success' })
-      setTimeout(() => wx.redirectTo({ url: '/pages/works/works' }), 500)
+      const tempFilePath = await this.getShareImageTempPath()
+      if (typeof wx.showShareImageMenu !== 'function') throw new Error('当前微信版本暂不支持图片转发')
+      wx.showShareImageMenu({ path: tempFilePath })
     } catch (error) {
-      console.error('删除作品失败:', error)
-      showErrorToast(error, '删除作品失败，请稍后重试。')
-      this.setData({ deleting: false })
+      console.error('转发分享图失败:', error)
+      showErrorToast(error, '转发为贴图失败，请更新微信后重试。')
+    } finally {
+      wx.hideLoading()
     }
   },
 
@@ -181,7 +185,7 @@ Page({
   },
 
   async rewriteSameImage() {
-    if (!this.data.isFresh || !this.data.workId || this.data.deleting) return
+    if (!this.data.workId) return
     wx.showLoading({ title: '正在重新开始…', mask: true })
     try {
       const response = await callFunctionWithTimeout('createCreation', {
