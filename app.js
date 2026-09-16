@@ -11,12 +11,5 @@ App({
       env: ENV_ID,
       traceUser: true
     })
-
-    this.globalData = {
-      poemResult: null,
-      sharePosterMeta: null,
-      shouldResetSelection: false,
-      shouldAutoChooseImage: false
-    }
   }
 })

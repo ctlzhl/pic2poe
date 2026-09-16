@@ -7,8 +7,7 @@
 const TIMEOUT_CONFIG = {
   DOWNLOAD: 15000,       // 下载文件：15秒
   UPLOAD: 30000,         // 上传文件：30秒
-  CLOUD_FUNCTION: 20000, // 云函数调用：20秒
-  SAVE_ALBUM: 10000      // 保存到相册：10秒
+  CLOUD_FUNCTION: 20000  // 云函数调用：20秒
 }
 
 /**
@@ -94,36 +93,8 @@ const callFunctionWithTimeout = (name, data, timeout = TIMEOUT_CONFIG.CLOUD_FUNC
   })
 }
 
-/**
- * 带超时的保存到相册
- * @param {string} filePath - 文件路径
- * @param {number} timeout - 超时时间（毫秒），默认10秒
- * @returns {Promise} 包含保存结果的Promise
- */
-const saveToAlbumWithTimeout = (filePath, timeout = TIMEOUT_CONFIG.SAVE_ALBUM) => {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error('保存超时，请稍后重试'))
-    }, timeout)
-
-    wx.saveImageToPhotosAlbum({
-      filePath,
-      success: (res) => {
-        clearTimeout(timer)
-        resolve(res)
-      },
-      fail: (err) => {
-        clearTimeout(timer)
-        reject(err)
-      }
-    })
-  })
-}
-
 module.exports = {
-  TIMEOUT_CONFIG,
   downloadFileWithTimeout,
   uploadFileWithTimeout,
-  callFunctionWithTimeout,
-  saveToAlbumWithTimeout
+  callFunctionWithTimeout
 }
