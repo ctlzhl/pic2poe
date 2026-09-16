@@ -87,3 +87,50 @@ test('原生图片分享菜单调用失败时提示在真机预览中重试', as
     else global.wx = originalWx
   }
 })
+
+test('分享图预生成未完成时首次点击会等待并直接打开菜单', async () => {
+  const definition = loadPageDefinition()
+  const page = createPage(definition, {
+    workId: 'work-1',
+    shareImageUrl: '',
+    shareLoading: true
+  })
+  let finishGeneration
+  page.shareCardPromise = new Promise((resolve) => {
+    finishGeneration = () => {
+      page.setData({ shareImageUrl: 'https://example.com/share-card.jpg' })
+      page.shareImageTempPath = '/tmp/share-card.jpg'
+      resolve('https://example.com/share-card.jpg')
+    }
+  })
+
+  const originalWx = global.wx
+  let shownPath = ''
+  let toastCount = 0
+  global.wx = {
+    showLoading() {},
+    hideLoading() {},
+    showToast() {
+      toastCount += 1
+    },
+    showShareImageMenu({ path, success }) {
+      shownPath = path
+      success()
+    }
+  }
+
+  try {
+    const opening = page.openNativeShareMenu()
+    await Promise.resolve()
+    assert.equal(shownPath, '')
+
+    finishGeneration()
+    await opening
+
+    assert.equal(shownPath, '/tmp/share-card.jpg')
+    assert.equal(toastCount, 0)
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})

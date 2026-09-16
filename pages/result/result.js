@@ -93,26 +93,40 @@ Page({
   },
 
   async prepareShareCard(workId = this.data.workId) {
-    if (!workId || this.data.isShared || this.data.shareLoading) return
+    if (!workId || this.data.isShared) return ''
+    if (this.data.shareImageUrl) return this.data.shareImageUrl
+    if (this.shareCardPromise) return this.shareCardPromise
+
     this.setData({ shareLoading: true, shareError: '' })
-    try {
-      const response = await callFunctionWithTimeout('createShareCard', { workId }, SHARE_TIMEOUT)
-      if (!response.result?.ok) {
-        console.error('createShareCard 返回失败:', response.result)
-        throw new Error(response.result?.message || '分享图生成失败')
+    const task = (async () => {
+      try {
+        const response = await callFunctionWithTimeout('createShareCard', { workId }, SHARE_TIMEOUT)
+        if (!response.result?.ok) {
+          console.error('createShareCard 返回失败:', response.result)
+          throw new Error(response.result?.message || '分享图生成失败')
+        }
+        const share = response.result.data
+        this.setData({
+          shareToken: share.shareToken,
+          shareImageUrl: share.shareImageUrl,
+          shareTitle: share.shareTitle || '照片有话说'
+        })
+        this.shareImageTempPath = ''
+        return share.shareImageUrl
+      } catch (error) {
+        console.error('生成分享图失败:', error)
+        this.setData({ shareError: error.message || '分享图生成失败，请重试。' })
+        return ''
+      } finally {
+        this.setData({ shareLoading: false })
       }
-      const share = response.result.data
-      this.setData({
-        shareToken: share.shareToken,
-        shareImageUrl: share.shareImageUrl,
-        shareTitle: share.shareTitle || '照片有话说'
-      })
-      this.shareImageTempPath = ''
-    } catch (error) {
-      console.error('生成分享图失败:', error)
-      this.setData({ shareError: error.message || '分享图生成失败，请重试。' })
+    })()
+
+    this.shareCardPromise = task
+    try {
+      return await task
     } finally {
-      this.setData({ shareLoading: false })
+      if (this.shareCardPromise === task) this.shareCardPromise = null
     }
   },
 
@@ -129,16 +143,15 @@ Page({
   },
 
   async openNativeShareMenu() {
-    if (!this.data.shareImageUrl) {
-      if (!this.data.shareLoading) {
-        this.prepareShareCard()
-      }
-      wx.showToast({ title: '分享图正在准备，请稍候', icon: 'none' })
-      return
-    }
-
     wx.showLoading({ title: '正在打开…', mask: true })
     try {
+      if (!this.data.shareImageUrl) {
+        const shareImageUrl = await this.prepareShareCard()
+        if (!shareImageUrl || !this.data.shareImageUrl) {
+          throw new Error(this.data.shareError || '分享图生成失败，请稍后重试。')
+        }
+      }
+
       const tempFilePath = await this.getShareImageTempPath()
       if (typeof wx.showShareImageMenu !== 'function') throw new Error('当前微信版本暂不支持图片分享')
       await new Promise((resolve, reject) => {
