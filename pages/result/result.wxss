@@ -19,7 +19,7 @@ page { min-height: 100%; background: #f8f7f2; color: #273025; }
 .primary-button[disabled] { background: #aeb9aa; color: #f7f7f5; }
 .secondary-button { margin-top: 18rpx; background: #edf2e9; color: #426145; }
 .primary-button::after, .secondary-button::after { border: none; }
-.action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 12rpx; box-sizing: border-box; }
-.action-button { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; height: 88rpx; margin: 0; padding: 0; box-sizing: border-box; color: #426145; background: #edf2e9; border-radius: 20rpx; font-size: 25rpx; line-height: 1; white-space: nowrap; }
+.action-grid { display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; }
+.action-button { display: flex; flex: none; align-items: center; justify-content: center; width: 30.5%; min-width: 0; height: 88rpx; margin: 0; padding: 0; box-sizing: border-box; color: #426145; background: #edf2e9; border-radius: 20rpx; font-size: 24rpx; line-height: 1; white-space: nowrap; }
 .share-button { color: #fff; background: #4a684c; }
 .action-button::after { border: none; }

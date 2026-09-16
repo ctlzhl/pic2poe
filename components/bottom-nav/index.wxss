@@ -5,7 +5,7 @@
   bottom: 0;
   left: 0;
   display: flex;
-  height: 104rpx;
+  height: calc(104rpx + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   box-sizing: border-box;
   background: rgba(253, 251, 251, .98);
