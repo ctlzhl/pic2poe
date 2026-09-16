@@ -29,9 +29,9 @@
     </view>
 
     <view wx:if="{{!isShared}}" class="actions action-grid">
-      <button class="action-button" bindtap="rewriteSameImage">重新创作</button>
-      <button class="action-button" bindtap="createAgain">换图再写</button>
-      <button class="action-button share-button" bindtap="openNativeShareMenu">保存分享</button>
+      <view class="action-button" role="button" hover-class="action-button-hover" bindtap="rewriteSameImage">重新创作</view>
+      <view class="action-button" role="button" hover-class="action-button-hover" bindtap="createAgain">换图再写</view>
+      <view class="action-button share-button" role="button" hover-class="action-button-hover" bindtap="openNativeShareMenu">保存分享</view>
     </view>
 
     <view wx:else class="actions">

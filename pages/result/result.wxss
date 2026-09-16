@@ -19,7 +19,9 @@ page { min-height: 100%; background: #f8f7f2; color: #273025; }
 .primary-button[disabled] { background: #aeb9aa; color: #f7f7f5; }
 .secondary-button { margin-top: 18rpx; background: #edf2e9; color: #426145; }
 .primary-button::after, .secondary-button::after { border: none; }
-.action-grid { display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; }
-.action-button { display: flex; flex: none; align-items: center; justify-content: center; width: 30.5%; min-width: 0; height: 88rpx; margin: 0; padding: 0; box-sizing: border-box; color: #426145; background: #edf2e9; border-radius: 20rpx; font-size: 24rpx; line-height: 1; white-space: nowrap; }
+.action-grid { display: flex; align-items: center; width: 100%; padding: 0 8rpx; box-sizing: border-box; }
+.action-button { display: flex; flex: 1 1 0; align-items: center; justify-content: center; width: 0; min-width: 0; height: 88rpx; margin: 0 8rpx; padding: 0; box-sizing: border-box; color: #426145; background: #edf2e9; border-radius: 20rpx; font-size: 24rpx; line-height: 1; white-space: nowrap; }
+.action-button:first-child { margin-left: 0; }
+.action-button:last-child { margin-right: 0; }
+.action-button-hover { opacity: .78; }
 .share-button { color: #fff; background: #4a684c; }
-.action-button::after { border: none; }
