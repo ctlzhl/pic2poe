@@ -26,6 +26,11 @@ const safeUrl = (value = '') => {
 const HIDDEN_CATEGORY_IDS = Object.freeze([343, 398])
 const HIDDEN_CATEGORY_NAMES = new Set(['昨年今日', '就是瞎拍'])
 
+const isHiddenPost = (post = {}) => {
+  const categories = Array.isArray(post.categories) ? post.categories : []
+  return categories.some((categoryId) => HIDDEN_CATEGORY_IDS.includes(Number(categoryId)))
+}
+
 const removeLeadingSummary = (value = '') => {
   const html = String(value)
   const firstContentTag = html.search(/<(?:h[1-6]|p|ul|ol|blockquote|img)\b/i)
@@ -94,4 +99,4 @@ const normalizePost = (post = {}, { includeContent = true } = {}) => {
   }
 }
 
-module.exports = { HIDDEN_CATEGORY_IDS, normalizeCategories, normalizePost, sanitizeContentHtml, stripHtml }
+module.exports = { HIDDEN_CATEGORY_IDS, isHiddenPost, normalizeCategories, normalizePost, sanitizeContentHtml, stripHtml }

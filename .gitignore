@@ -7,6 +7,9 @@ cloudfunctions/**/node_modules/
 cloudfunctions/**/.DS_Store
 
 # 敏感配置文件
+.env
+.env.*
+!.env.example
 cloudfunctions/**/config.json
 !cloudfunctions/createShareCard/config.json
 project.private.config.json
@@ -18,6 +21,9 @@ project.private.config.json
 # IDE
 .vscode/
 .idea/
+.codebuddy/
+.snapshots/
+docs/superpowers/
 
 # 临时文件
 *.tmp

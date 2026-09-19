@@ -68,6 +68,7 @@ Page({
     if (this.data.preparing || this.data.submitting) return
 
     let loadingShown = false
+    let stagingFileId = ''
     try {
       const selection = await wx.chooseMedia({
         count: 1,
@@ -114,8 +115,10 @@ Page({
       }
       const { assetId, stagingPath } = uploadTicket.result.data
       const upload = await uploadFileWithTimeout(stagingPath, tempFilePath)
+      stagingFileId = upload.fileID
       const response = await callFunctionWithTimeout('prepareImage', { assetId, fileID: upload.fileID }, PREPARE_TIMEOUT)
       if (!response.result?.ok) throw new Error(getFailureMessage(response.result, '图片处理失败，请换一张再试。'))
+      stagingFileId = ''
 
       this.setData({
         assetId,
@@ -124,6 +127,13 @@ Page({
       })
     } catch (error) {
       if (error?.errMsg?.includes('cancel')) return
+      if (stagingFileId) {
+        try {
+          await wx.cloud.deleteFile({ fileList: [stagingFileId] })
+        } catch (cleanupError) {
+          console.warn('回收暂存图片失败:', cleanupError)
+        }
+      }
       console.error('上传并处理图片失败:', error)
       this.setData({ assetId: '', prepareState: 'error' })
       showErrorToast(error, '图片处理失败，请换一张再试。')
@@ -175,6 +185,7 @@ Page({
         throw new Error(getFailureMessage(response.result, '创建创作任务失败，请稍后重试。'))
       }
 
+      this.setData({ idempotencyKey: createIdempotencyKey() })
       wx.navigateTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}` })
     } catch (error) {
       console.error('创建创作任务失败:', error)

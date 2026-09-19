@@ -1,9 +1,12 @@
 const cloud = require('wx-server-sdk')
+const { hasActiveTask } = require('./retry-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const command = db.command
 const MAX_ATTEMPTS_PER_TASK = 3
+const ACTIVE_STATUSES = ['queued', 'analyzing', 'generating', 'validating']
 
 const fail = (code, message) => ({ ok: false, code, message })
 const newId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
@@ -32,6 +35,12 @@ exports.main = async (event = {}) => {
       if (!assetResult.data || assetResult.data.userId !== openid || assetResult.data.status !== 'ready') {
         return { expiredAsset: true }
       }
+
+      const activeTasksResult = await transaction.collection('creationTasks')
+        .where({ userId: openid, status: command.in(ACTIVE_STATUSES) })
+        .limit(1)
+        .get()
+      if (hasActiveTask(activeTasksResult.data || [])) return { activeTask: true }
 
       const nextNumber = Number(task.attemptNumber || 1) + 1
       if (nextNumber > MAX_ATTEMPTS_PER_TASK) return { retryLimitReached: true }
@@ -64,6 +73,7 @@ exports.main = async (event = {}) => {
     if (result.notFound) return fail('TASK_NOT_FOUND', '创作任务不存在或已失效。')
     if (result.expiredAsset) return fail('INVALID_ASSET', '图片已过期，请重新上传后再创作。')
     if (result.notRetryable) return fail('NOT_RETRYABLE', '当前任务暂时不能重试。')
+    if (result.activeTask) return fail('ACTIVE_TASK_EXISTS', '已有创作正在进行，请完成后再试。')
     if (result.retryLimitReached) return fail('RETRY_LIMIT_REACHED', '这份作品已尝试 3 次，请换一张照片重新创作。')
     return { ok: true, data: { taskId, status: 'queued', attemptNumber: result.nextNumber } }
   } catch (error) {

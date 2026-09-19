@@ -1,12 +1,14 @@
 const crypto = require('node:crypto')
 const cloud = require('wx-server-sdk')
+const { landscapePoemLayout, portraitPoemLayout } = require('./share-layout')
+const { canCreateShareForWork } = require('./share-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const CANVAS_WIDTH = 1440
 const CANVAS_HEIGHT = 1800
-const TEMPLATE_VERSION = 'share-v2'
+const TEMPLATE_VERSION = 'share-v5'
 const CARD_TOP_GAP = 48
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
@@ -94,9 +96,16 @@ const getShareTitle = (work) => {
   return truncate(work.content?.copy?.headline || '照片有话说', 28)
 }
 
-const renderPhoto = (imageBuffer, width, height) => sharp(imageBuffer)
+const renderPhoto = (imageBuffer, width, height, options = {}) => sharp(imageBuffer)
   .rotate()
-  .resize({ width, height, fit: 'contain', background: '#e7e1d5', withoutEnlargement: false })
+  .resize({
+    width,
+    height,
+    fit: options.fit || 'contain',
+    position: options.position || 'centre',
+    background: '#e7e1d5',
+    withoutEnlargement: false
+  })
   .jpeg({ quality: 90, mozjpeg: true })
   .toBuffer()
 
@@ -183,22 +192,27 @@ const renderPoemCard = async (work, source, metadata, qr) => {
   const landscape = metadata.width > metadata.height * 1.1
 
   if (landscape) {
-    const photo = await renderPhoto(source, CANVAS_WIDTH, 1020)
+    const layout = landscapePoemLayout()
+    const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
     const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${CANVAS_WIDTH}" height="780" fill="#f7f1e7"/>
-      ${svgText([title], { x: 104, y: 172, fontSize: 64, lineHeight: 76, fill: '#263426', weight: 700, family })}
-      ${svgText(lines, { x: 104, y: 300, fontSize: 52, lineHeight: 86, fill: '#3c493b', family })}
+      <rect x="0" y="0" width="${CANVAS_WIDTH}" height="${layout.photo.top}" fill="#f7f1e7"/>
+      ${svgText([title], { x: layout.text.x, y: layout.text.titleY, fontSize: 64, lineHeight: 76, fill: '#263426', weight: 700, family, anchor: layout.text.anchor })}
+      ${svgText(lines, { x: layout.text.x, y: layout.text.bodyY, fontSize: 52, lineHeight: 86, fill: '#3c493b', family, anchor: layout.text.anchor })}
     </svg>`
-    return compose(photo, { left: 0, top: 780 }, textSvg, qr, { left: 1180, top: 540 })
+    return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
   }
 
-  const photo = await renderPhoto(source, 780, CANVAS_HEIGHT - CARD_TOP_GAP)
+  const titleLines = wrapText(title, 8, 2)
+  const rotated = [5, 6, 7, 8].includes(Number(metadata.orientation))
+  const imageAspect = rotated ? metadata.height / metadata.width : metadata.width / metadata.height
+  const layout = portraitPoemLayout({ titleLineCount: titleLines.length, poemLineCount: lines.length || 1, imageAspect })
+  const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
   const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-    <rect x="780" y="0" width="660" height="${CANVAS_HEIGHT}" fill="#f7f1e7"/>
-    ${svgText(wrapText(title, 8, 2), { x: 850, y: 164, fontSize: 58, lineHeight: 78, fill: '#263426', weight: 700, family })}
-    ${svgText(lines, { x: 850, y: 410, fontSize: 48, lineHeight: 90, fill: '#3c493b', family })}
+    <rect x="${layout.photo.width}" y="0" width="${CANVAS_WIDTH - layout.photo.width}" height="${CANVAS_HEIGHT}" fill="#f7f1e7"/>
+    ${svgText(titleLines, { x: layout.text.x, y: layout.text.titleY, fontSize: 58, lineHeight: 78, fill: '#263426', weight: 700, family, anchor: layout.text.anchor })}
+    ${svgText(lines, { x: layout.text.x, y: layout.text.bodyY, fontSize: 48, lineHeight: 90, fill: '#3c493b', family, anchor: layout.text.anchor })}
   </svg>`
-  return compose(photo, { left: 0, top: CARD_TOP_GAP }, textSvg, qr, { left: 1218, top: 1580 })
+  return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
 }
 
 const renderEditorialCard = async (work, source, qr) => {
@@ -278,7 +292,7 @@ exports.main = async (event = {}) => {
   try {
     loadSharp()
     const work = (await db.collection('works').doc(workId).get()).data
-    if (!work || work.userId !== openid) return fail('WORK_NOT_FOUND', '作品不存在或已失效。')
+    if (!canCreateShareForWork(work, openid)) return fail('WORK_NOT_FOUND', '作品不存在或已失效。')
 
     let draft = null
     try {
@@ -326,7 +340,7 @@ exports.main = async (event = {}) => {
       } catch (error) {
         throw new Error('WORK_NOT_FOUND')
       }
-      if (!latestWork || latestWork.userId !== openid || !latestAsset || latestAsset.userId !== openid) {
+      if (!canCreateShareForWork(latestWork, openid) || !latestAsset || latestAsset.userId !== openid) {
         throw new Error('WORK_NOT_FOUND')
       }
       await transaction.collection('shareCards').add({

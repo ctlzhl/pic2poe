@@ -1,9 +1,9 @@
 const cloud = require('wx-server-sdk')
+const { parsePagination } = require('./list-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const PAGE_SIZE = 30
 const fail = (code, message) => ({ ok: false, code, message })
 
 const toTimestamp = (value) => {
@@ -39,18 +39,16 @@ const readAsset = async (assetId, openid) => {
 exports.main = async (event = {}) => {
   const openid = cloud.getWXContext().OPENID
   if (!openid) return fail('UNAUTHORIZED', '请先登录后再查看作品。')
-  const requestedLimit = Number(event.limit)
-  const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
-    ? Math.min(PAGE_SIZE, requestedLimit)
-    : PAGE_SIZE
+  const { page, limit, skip } = parsePagination(event)
 
   try {
     const worksCollection = db.collection('works').where({ userId: openid })
     const [result, countResult] = await Promise.all([
-      worksCollection.orderBy('createdAt', 'desc').limit(limit).get(),
+      worksCollection.orderBy('createdAt', 'desc').skip(skip).limit(limit).get(),
       worksCollection.count()
     ])
     const works = result.data || []
+    const total = Number(countResult.total || 0)
     const assets = await Promise.all(works.map((work) => readAsset(work.imageAssetId, openid)))
     const fileIds = [...new Set(assets.map((asset) => asset?.thumbnailFileId).filter(Boolean))]
     const fileResult = fileIds.length > 0 ? await cloud.getTempFileURL({ fileList: fileIds }) : { fileList: [] }
@@ -59,7 +57,11 @@ exports.main = async (event = {}) => {
     return {
       ok: true,
       data: {
-        total: Number(countResult.total || 0),
+        total,
+        page,
+        pageSize: limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        hasMore: page * limit < total,
         works: works.map((work, index) => ({
           workId: work._id,
           type: work.type,

@@ -1,4 +1,5 @@
 const cloud = require('wx-server-sdk')
+const { findRemainingWork, shouldDeleteAsset, shareFileIdsForDeletion } = require('./delete-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -8,7 +9,9 @@ const fail = (code, message) => ({ ok: false, code, message })
 const deleteFiles = async (fileIds) => {
   const unique = [...new Set(fileIds.filter(Boolean))]
   for (let index = 0; index < unique.length; index += 50) {
-    await cloud.deleteFile({ fileList: unique.slice(index, index + 50) })
+    const result = await cloud.deleteFile({ fileList: unique.slice(index, index + 50) })
+    const failed = (result.fileList || []).filter((file) => Number(file?.status) !== 0)
+    if (failed.length > 0) throw new Error(`FILE_DELETE_FAILED:${failed.map((file) => file.fileID).join(',')}`)
   }
 }
 
@@ -31,13 +34,18 @@ exports.main = async (event = {}) => {
     const work = await getOwnedDocument('works', workId, openid)
     if (!work) return fail('WORK_NOT_FOUND', '作品不存在或已失效。')
     const asset = await getOwnedDocument('imageAssets', work.imageAssetId, openid)
-    const sharesResult = await db.collection('shareCards').where({ workId, userId: openid }).limit(100).get()
-    const shares = sharesResult.data || []
-
-    await db.runTransaction(async (transaction) => {
+    const deletion = await db.runTransaction(async (transaction) => {
       const latestResult = await transaction.collection('works').doc(workId).get()
       const latest = latestResult.data
       if (!latest || latest.userId !== openid) throw new Error('WORK_NOT_FOUND')
+      const relatedWorksResult = asset
+        ? await transaction.collection('works').where({ userId: openid, imageAssetId: latest.imageAssetId }).limit(2).get()
+        : { data: [] }
+      const relatedWorks = relatedWorksResult.data || []
+      const remainingWork = findRemainingWork(workId, relatedWorks)
+      const deleteAsset = Boolean(asset && shouldDeleteAsset(workId, relatedWorks))
+      const sharesResult = await transaction.collection('shareCards').where({ workId, userId: openid }).limit(100).get()
+      const shares = sharesResult.data || []
 
       for (const share of shares) {
         // 先撤销令牌，保证后续任何失败都不会让已删除作品继续被公开访问。
@@ -56,7 +64,7 @@ exports.main = async (event = {}) => {
       }
 
       if (latest.draftId) await transaction.collection('creationDrafts').doc(latest.draftId).remove()
-      if (asset) {
+      if (deleteAsset) {
         // 文件删除可能是暂时性失败。保留待清理资产让定时任务可以继续回收。
         await transaction.collection('imageAssets').doc(asset._id).update({
           data: {
@@ -68,21 +76,28 @@ exports.main = async (event = {}) => {
             updatedAt: db.serverDate()
           }
         })
+      } else if (asset && remainingWork) {
+        await transaction.collection('imageAssets').doc(asset._id).update({
+          data: { workId: remainingWork._id, updatedAt: db.serverDate() }
+        })
       }
       await transaction.collection('works').doc(workId).remove()
+      return { deleteAsset, shares }
     })
 
     try {
       await deleteFiles([
-        asset?.stagingFileId,
-        asset?.originalFileId,
-        asset?.creationFileId,
-        asset?.thumbnailFileId,
-        ...shares.flatMap((share) => [share.fileId, share.creationFileId])
+        ...(deletion.deleteAsset ? [
+          asset?.stagingFileId,
+          asset?.originalFileId,
+          asset?.creationFileId,
+          asset?.thumbnailFileId
+        ] : []),
+        ...shareFileIdsForDeletion(deletion.shares)
       ])
       await Promise.all([
-        ...shares.map((share) => db.collection('shareCards').doc(share._id).remove()),
-        ...(asset ? [db.collection('imageAssets').doc(asset._id).remove()] : [])
+        ...deletion.shares.map((share) => db.collection('shareCards').doc(share._id).remove()),
+        ...(deletion.deleteAsset && asset ? [db.collection('imageAssets').doc(asset._id).remove()] : [])
       ])
     } catch (error) {
       // 分享凭证已撤销；待清理记录由定时清理函数在下一轮继续处理。

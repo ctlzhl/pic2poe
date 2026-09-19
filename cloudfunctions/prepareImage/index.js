@@ -1,5 +1,6 @@
 const cloud = require('wx-server-sdk')
 const sharp = require('sharp')
+const { uploadWithCompensation } = require('./storage-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -46,14 +47,17 @@ const markAssetFailed = async (assetId, code) => {
   }
 }
 
-const bestEffortDelete = async (fileID) => {
-  if (!fileID) return
+const bestEffortDeleteFiles = async (fileIDs) => {
+  const fileList = [...new Set((fileIDs || []).filter(Boolean))]
+  if (fileList.length === 0) return
   try {
-    await cloud.deleteFile({ fileList: [fileID] })
+    await cloud.deleteFile({ fileList })
   } catch (error) {
-    console.warn('暂存文件清理失败:', error && error.message ? error.message : String(error))
+    console.warn('图片文件清理失败:', error && error.message ? error.message : String(error))
   }
 }
+
+const bestEffortDelete = async (fileID) => bestEffortDeleteFiles([fileID])
 
 const buildDerivedImages = async (input) => {
   const base = sharp(input, { limitInputPixels: MAX_PIXELS, pages: 1 })
@@ -168,28 +172,33 @@ exports.main = async (event = {}) => {
   const thumbnailPath = `users/${openid}/thumbnail/${assetId}.jpg`
 
   try {
-    const [original, creation, thumbnail] = await Promise.all([
-      cloud.uploadFile({ cloudPath: originalPath, fileContent: input }),
-      cloud.uploadFile({ cloudPath: creationPath, fileContent: derived.creationBuffer }),
-      cloud.uploadFile({ cloudPath: thumbnailPath, fileContent: derived.thumbnailBuffer })
-    ])
-
-    await db.collection('imageAssets').doc(assetId).update({
-      data: {
-        status: 'ready',
-        originalFileId: original.fileID,
-        creationFileId: creation.fileID,
-        thumbnailFileId: thumbnail.fileID,
-        sourceFormat: metadata.format,
-        inputBytes,
-        creationBytes: Buffer.byteLength(derived.creationBuffer),
-        thumbnailBytes: Buffer.byteLength(derived.thumbnailBuffer),
-        metadata: toPublicMetadata(metadata),
-        stagingFileId: '',
-        errorCode: '',
-        readyAt: db.serverDate(),
-        updatedAt: db.serverDate(),
-        expiresAt: new Date(Date.now() + ORIGINAL_TTL_MS)
+    const [original, creation, thumbnail] = await uploadWithCompensation({
+      uploads: [
+        { cloudPath: originalPath, fileContent: input },
+        { cloudPath: creationPath, fileContent: derived.creationBuffer },
+        { cloudPath: thumbnailPath, fileContent: derived.thumbnailBuffer }
+      ],
+      uploadFile: (options) => cloud.uploadFile(options),
+      cleanupFileIds: bestEffortDeleteFiles,
+      afterUpload: async ([uploadedOriginal, uploadedCreation, uploadedThumbnail]) => {
+        await db.collection('imageAssets').doc(assetId).update({
+          data: {
+            status: 'ready',
+            originalFileId: uploadedOriginal.fileID,
+            creationFileId: uploadedCreation.fileID,
+            thumbnailFileId: uploadedThumbnail.fileID,
+            sourceFormat: metadata.format,
+            inputBytes,
+            creationBytes: Buffer.byteLength(derived.creationBuffer),
+            thumbnailBytes: Buffer.byteLength(derived.thumbnailBuffer),
+            metadata: toPublicMetadata(metadata),
+            stagingFileId: '',
+            errorCode: '',
+            readyAt: db.serverDate(),
+            updatedAt: db.serverDate(),
+            expiresAt: new Date(Date.now() + ORIGINAL_TTL_MS)
+          }
+        })
       }
     })
 

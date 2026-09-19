@@ -1,30 +1,26 @@
 <view class="page">
   <view wx:if="{{profileLoading}}" class="state">正在确认登录状态…</view>
 
-  <view wx:elif="{{!authorized}}" class="guest-profile">
-    <view class="profile-tap" bindtap="authorizeProfile">
-      <view class="avatar placeholder-avatar">照</view>
-      <view class="profile-info">
-        <view class="profile-name">点击授权登录</view>
-        <view class="profile-copy">点击头像或昵称，授权微信资料后查看作品。</view>
-      </view>
-    </view>
-    <view class="privacy-copy">仅用于展示你的个人资料，不会公开你的作品。</view>
-  </view>
-
   <block wx:else>
     <view class="profile">
-      <view class="profile-tap" bindtap="authorizeProfile">
+      <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" loading="{{authorizing}}">
         <image wx:if="{{profile.avatarUrl}}" class="avatar" src="{{profile.avatarUrl}}" mode="aspectFill"></image>
         <view wx:else class="avatar">照</view>
-        <view class="profile-info"><view class="profile-name">{{profile.nickName || '我的创作'}}</view><view class="profile-copy">把此刻，好好留住。</view></view>
+      </button>
+      <view class="profile-info">
+        <input class="profile-name-input" type="nickname" value="{{profile.nickName}}" placeholder="点击授权微信昵称" maxlength="40" focus="{{nicknameFocused}}" bindtap="focusNickname" bindinput="onNicknameInput" bindblur="onNicknameBlur" />
+        <view class="profile-copy">{{authorized ? '把此刻，好好留住。' : '点击头像和昵称，完成微信资料授权。'}}</view>
       </view>
       <view class="settings" bindtap="openSettings">设置</view>
     </view>
 
-    <view wx:if="{{loading}}" class="state">正在整理作品…</view>
-    <view wx:elif="{{errorMessage}}" class="state"><view>{{errorMessage}}</view><button class="text-button" bindtap="loadRecentWorks">重新加载</button></view>
-    <view wx:elif="{{!works.length}}" class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="primary-button" bindtap="startCreation">开始创作</button></view>
+    <view wx:if="{{!authorized}}" class="guest-profile">
+      <view class="privacy-copy">仅用于展示你的个人资料，不会公开你的作品。</view>
+    </view>
+
+    <block wx:elif="{{loading}}"><view class="state">正在整理作品…</view></block>
+    <block wx:elif="{{errorMessage}}"><view class="state"><view>{{errorMessage}}</view><button class="text-button" bindtap="loadRecentWorks">重新加载</button></view></block>
+    <block wx:elif="{{!works.length}}"><view class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="primary-button" bindtap="startCreation">开始创作</button></view></block>
     <block wx:else>
       <view class="section-head"><view>我的作品（{{totalWorks}}）</view><view class="all-link" bindtap="openAllWorks">查看全部</view></view>
       <view class="grid">

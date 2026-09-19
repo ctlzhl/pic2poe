@@ -27,7 +27,12 @@
           <view class="work-excerpt">{{item.excerpt}}</view>
         </view>
       </view>
-      <button class="delete-button" data-work-id="{{item.workId}}" loading="{{deletingWorkId === item.workId}}" disabled="{{!!deletingWorkId}}" bindtap="deleteWork">删除</button>
+      <view class="delete-button" role="button" aria-label="删除作品" hover-class="delete-button-hover" data-work-id="{{item.workId}}" bindtap="deleteWork">{{deletingWorkId === item.workId ? '…' : '删除'}}</view>
+    </view>
+    <view wx:if="{{totalPages > 1}}" class="pager">
+      <button class="pager-button" disabled="{{page <= 1}}" bindtap="previousPage">上一页</button>
+      <view class="pager-status">第 {{page}} / {{totalPages}} 页</view>
+      <button class="pager-button" disabled="{{page >= totalPages}}" bindtap="nextPage">下一页</button>
     </view>
   </view>
 </view>

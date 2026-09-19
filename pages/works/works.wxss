@@ -13,12 +13,18 @@ page { min-height: 100%; background: #f8f7f2; color: #273025; }
 .secondary-button { background: #edf2e9; color: #426145; }
 .primary-button::after, .secondary-button::after, .delete-button::after { border: none; }
 .work-list { display: flex; flex-direction: column; gap: 22rpx; }
-.work-card { display: flex; align-items: center; gap: 18rpx; padding: 18rpx; border-radius: 22rpx; background: #fffdf8; box-shadow: 0 10rpx 28rpx rgba(47, 57, 44, .08); }
+.work-card { position: relative; display: flex; align-items: center; gap: 18rpx; padding: 18rpx; border-radius: 22rpx; background: #fffdf8; box-shadow: 0 10rpx 28rpx rgba(47, 57, 44, .08); }
 .work-main { display: flex; flex: 1; min-width: 0; align-items: center; gap: 18rpx; }
 .thumbnail { width: 144rpx; height: 144rpx; flex: 0 0 144rpx; border-radius: 16rpx; background: #e5e7df; }
 .placeholder { display: flex; align-items: center; justify-content: center; color: #8c9687; font-size: 24rpx; }
-.work-copy { min-width: 0; }
+.work-copy { min-width: 0; padding-right: 64rpx; }
 .work-meta { color: #788373; font-size: 22rpx; }
 .work-title { margin-top: 10rpx; overflow: hidden; color: #303b2f; font-size: 31rpx; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .work-excerpt { display: -webkit-box; margin-top: 8rpx; overflow: hidden; color: #697366; font-size: 24rpx; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.delete-button { flex: 0 0 auto; margin: 0; padding: 12rpx; background: transparent; color: #9a5b4e; font-size: 23rpx; line-height: 1; }
+.delete-button { position: absolute; top: 16rpx; right: 16rpx; display: flex; width: 48rpx; height: 44rpx; align-items: center; justify-content: center; background: transparent; color: #a66a5e; font-size: 20rpx; line-height: 1; }
+.delete-button-hover { opacity: .55; }
+.pager { display: flex; align-items: center; justify-content: space-between; margin: 18rpx 0 4rpx; padding: 10rpx 4rpx; }
+.pager-button { min-width: 128rpx; height: 60rpx; margin: 0; padding: 0 18rpx; border-radius: 30rpx; background: #edf2e9; color: #426145; font-size: 24rpx; line-height: 60rpx; }
+.pager-button::after { border: none; }
+.pager-button[disabled] { background: #f2f3ef; color: #b0b6ac; }
+.pager-status { color: #74806f; font-size: 24rpx; }

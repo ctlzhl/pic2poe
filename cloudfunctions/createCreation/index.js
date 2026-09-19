@@ -1,4 +1,5 @@
 const cloud = require('wx-server-sdk')
+const { findUserRecord } = require('./creation-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -118,15 +119,18 @@ exports.main = async (event = {}) => {
       const nowMs = Date.now()
       // CloudBase 的 doc(id).get() 在文档不存在时会抛异常。首次创作没有
       // users 文档是正常情况，因此使用 where 查询以获得空数组而非异常。
-      const existingUser = await transaction.collection('users')
+      const usersByOpenid = await transaction.collection('users')
         .where({ openid })
         .limit(1)
         .get()
-      const user = existingUser.data[0] || null
+      const usersByLegacyId = usersByOpenid.data.length > 0
+        ? { data: [] }
+        : await transaction.collection('users').where({ userId: openid }).limit(1).get()
+      const user = findUserRecord(openid, [...(usersByOpenid.data || []), ...(usersByLegacyId.data || [])])
       const quota = consumeCreationQuota(user, nowMs)
       if (!quota.allowed) return { rateLimited: quota }
-      if (existingUser.data.length > 0) {
-        await transaction.collection('users').doc(user._id).update({ data: { ...quota.update, updatedAt: now } })
+      if (user) {
+        await transaction.collection('users').doc(user._id).update({ data: { openid, userId: openid, ...quota.update, updatedAt: now } })
       } else {
         await transaction.collection('users').doc(openid).set({
           data: {

@@ -68,3 +68,11 @@ test('normalizeCategories 仅返回可用于筛选的类目', () => {
 
   assert.deepEqual(categories, [{ id: 7, name: '旅行' }, { id: 9, name: '摄影' }])
 })
+
+test('isHiddenPost 阻止隐藏类目的文章被详情接口直接访问', () => {
+  const { isHiddenPost } = loadCore()
+  assert.equal(typeof isHiddenPost, 'function')
+
+  assert.equal(isHiddenPost({ categories: [7, 343] }), true)
+  assert.equal(isHiddenPost({ categories: [7, 9] }), false)
+})

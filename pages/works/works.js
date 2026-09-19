@@ -1,40 +1,40 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
+const { formatDotDate } = require('../../utils/date')
 
 const TYPE_TITLE = { poem: '五言绝句', review: '图片点评', copy: '配图文案' }
-
-const formatDate = (timestamp) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
-}
 
 Page({
   data: {
     loading: true,
     works: [],
     errorMessage: '',
-    deletingWorkId: ''
+    deletingWorkId: '',
+    page: 1,
+    totalPages: 1
   },
 
   onShow() {
-    this.loadWorks()
+    this.loadWorks(1)
   },
 
-  async loadWorks() {
+  async loadWorks(page = 1) {
     if (this.loadingWorks) return
     this.loadingWorks = true
     this.setData({ loading: true, errorMessage: '' })
     try {
-      const response = await callFunctionWithTimeout('listWorks')
+      const response = await callFunctionWithTimeout('listWorks', { page, limit: 10 })
       if (!response.result?.ok) throw new Error(response.result?.message || '读取作品列表失败')
       const works = (response.result.data?.works || []).map((work) => ({
         ...work,
         typeTitle: TYPE_TITLE[work.type] || '创作结果',
-        createdLabel: formatDate(work.createdAt)
+        createdLabel: formatDotDate(work.createdAt)
       }))
-      this.setData({ works })
+      this.setData({
+        works,
+        page: Number(response.result.data?.page || 1),
+        totalPages: Number(response.result.data?.totalPages || 1)
+      })
     } catch (error) {
       console.error('读取作品列表失败:', error)
       this.setData({ errorMessage: error.message || '读取作品列表失败，请稍后重试。' })
@@ -47,7 +47,15 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.loadWorks()
+    this.loadWorks(1)
+  },
+
+  previousPage() {
+    if (this.data.page > 1) this.loadWorks(this.data.page - 1)
+  },
+
+  nextPage() {
+    if (this.data.page < this.data.totalPages) this.loadWorks(this.data.page + 1)
   },
 
   openWork(event) {
@@ -71,8 +79,9 @@ Page({
     try {
       const response = await callFunctionWithTimeout('deleteWork', { workId })
       if (!response.result?.ok) throw new Error(response.result?.message || '删除作品失败')
-      this.setData({ works: this.data.works.filter((work) => work.workId !== workId) })
       wx.showToast({ title: '作品已删除', icon: 'success' })
+      const nextPage = this.data.works.length === 1 && this.data.page > 1 ? this.data.page - 1 : this.data.page
+      await this.loadWorks(nextPage)
     } catch (error) {
       console.error('删除作品失败:', error)
       showErrorToast(error, '删除作品失败，请稍后重试。')

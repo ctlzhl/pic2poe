@@ -1,265 +1,60 @@
 # 照片有话说
 
-> 新版 MVP 已迁移至 CloudBase 云函数架构。本文下方关于 `generatePoem`、`poemRecords`、GLM-4V 和旧数据库权限的说明仅保留作旧版历史参考，**不得用于新版部署**。新版请以 [纯 CloudBase 云函数实施计划](docs/CloudBase-云函数-MVP实施计划.md) 与 [P1 云端配置与验收](docs/P1-云端配置与验收.md) 为准。
+微信小程序「照片有话说」：上传一张照片，生成五言绝句、图片点评或配图文案，并可保存与分享创作结果。
 
-一个将照片转化为诗意作品的微信小程序，通过智谱AI生成符合格律的五言绝句，并将图片与古诗合成为精美作品。
+## 当前能力
 
-## 📱 功能特性
+- 图片上传、格式校验与缩略图处理，支持 JPG、PNG、WebP，单张最大 6MB
+- 三种创作类型：五言绝句、图片点评、配图文案
+- 创作任务、超时恢复、重试、频率限制与作品删除
+- 分享成品图与小程序码
+- 「我的作品」每页 10 条
+- 「随便看看」博客浏览、类目筛选与文章详情
+- 微信标准头像与昵称资料控件
 
-- ✨ **智能创作**：基于智谱AI GLM-4V视觉模型，分析图片内容创作古诗
-- 🎨 **精美合成**：将原图与古诗合成，添加半透明背景和优雅排版
-- 💾 **一键保存**：保存合成图片到手机相册
-- 📤 **轻松分享**：分享给微信好友或朋友圈
-- 🌟 **中国风UI**：优雅的界面设计，符合诗意美学
+## 项目结构
 
-## 🏗️ 技术架构
-
-### 前端
-- 微信小程序原生开发
-- 云开发能力（云存储 + 云函数）
-
-### 后端
-- **云函数**：generatePoem
-- **云存储**：存储原图和合成图
-- **AI模型**：智谱AI GLM-4V（备选腾讯混元）
-
-### 核心依赖
-- `wx-server-sdk`：微信云开发SDK
-- `axios`：HTTP请求库
-- `canvas`：Node.js图片处理库
-
-## 📦 项目结构
-
-```
-pic2poe/
-├── pages/
-│   ├── index/              # 首页 - 图片上传
-│   │   ├── index.js
-│   │   ├── index.wxml
-│   │   ├── index.wxss
-│   │   └── index.json
-│   └── result/             # 结果页 - 展示合成图
-│       ├── result.js
-│       ├── result.wxml
-│       ├── result.wxss
-│       └── result.json
-├── cloudfunctions/
-│   └── generatePoem/       # 云函数 - 生成古诗和合成图片
-│       ├── index.js
-│       ├── package.json
-│       └── config.json
-├── app.js                  # 小程序入口
-├── app.json                # 小程序配置
-├── app.wxss                # 全局样式
-└── project.config.json     # 项目配置
+```text
+pages/              小程序页面
+cloudfunctions/     CloudBase 云函数
+docs/               部署、云端配置与验收说明
+cloudbaserc.json    云函数部署清单与运行时配置
 ```
 
-## 🚀 快速开始
+主要页面为：首页、随便看看、文章详情、创作、创作中、结果、我的作品、设置与隐私说明。
 
-### 前置要求
+## 本地打开
 
-1. ✅ 已安装微信开发者工具
-2. ✅ 注册微信小程序账号
-3. ✅ 开通微信云开发
-4. ✅ 注册智谱AI账号并获取API Key
+1. 使用微信开发者工具导入本目录。
+2. 确认开发者工具已关联 CloudBase 环境。
+3. 编译小程序并在模拟器或真机预览。
 
-### 第一步：配置云开发环境
+不要把模型 API Key、小程序 AppSecret 或真实环境配置写入代码、数据库或 Git。`.env.example` 仅是本地配置示例；真实 `.env` 已被 Git 忽略。
 
-1. 在微信开发者工具中打开项目
-2. 点击"云开发"按钮，开通云开发
-3. 创建云开发环境，记录环境ID
-4. 在 `app.js` 中填入环境ID：
+## 云端部署
 
-```javascript
-wx.cloud.init({
-  env: 'your-env-id', // 替换为你的环境ID
-  traceUser: true,
-})
+完整的集合、索引、权限、环境变量、Sharp 打包和验收步骤见：[P1 云端配置与验收](docs/P1-云端配置与验收.md)。
+
+本轮更新以下云函数后，再重新编译小程序：
+
+```bash
+tcb fn deploy prepareImage -r ap-shanghai
+tcb fn deploy createCreation -r ap-shanghai
+tcb fn deploy runCreation -r ap-shanghai
+tcb fn deploy deleteWork -r ap-shanghai
+tcb fn deploy listWorks -r ap-shanghai
+tcb fn deploy getBlogPosts -r ap-shanghai
+tcb fn deploy userProfile -r ap-shanghai
 ```
 
-### 第二步：配置智谱AI
+`prepareImage` 使用 Linux x64 的 Sharp 依赖，部署前请按云端配置文档安装对应平台依赖。其余函数由 CloudBase 在云端安装依赖。
 
-1. 访问 [智谱AI开放平台](https://open.bigmodel.cn/)
-2. 注册并登录账号
-3. 创建API Key
-4. 复制API Key备用
+## 验证
 
-### 第三步：部署云函数
+在项目根目录运行：
 
-1. **创建云函数**
-   - 在微信开发者工具中，右键 `cloudfunctions` 目录
-   - 选择"新建 Node.js 云函数"，命名为 `generatePoem`
-   - 将代码文件复制到云函数目录
-
-2. **配置环境变量**
-   - 打开云开发控制台
-   - 进入"云函数" → "generatePoem" → "配置"
-   - 添加环境变量：
-     - 变量名：`ZHIPU_API_KEY`
-     - 变量值：你的智谱AI API Key
-
-3. **安装依赖并上传**
-   ```bash
-   cd cloudfunctions/generatePoem
-   npm install
-   ```
-   - 右键云函数，选择"上传并部署：云端安装依赖"
-
-### 第四步：配置云存储
-
-1. 在云开发控制台，进入"云存储"
-2. 创建以下目录：
-   - `images/` - 存储用户上传的原图
-   - `result/` - 存储合成后的图片
-
-### 第五步：配置权限
-
-1. 在云开发控制台，进入"数据库"
-2. 设置权限为"所有用户可读，仅创建者可写"
-
-### 第六步：运行测试
-
-1. 点击"编译"按钮
-2. 在模拟器中测试上传图片功能
-3. 检查云函数日志，确认AI调用成功
-4. 验证图片合成和保存功能
-
-## 🔧 配置说明
-
-### 智谱AI模型选择
-
-当前使用 `glm-4v` 模型（视觉理解模型），适合图片分析。
-
-**切换到腾讯混元**（备选方案）：
-
-1. 注册腾讯云账号，开通混元大模型
-2. 修改 `cloudfunctions/generatePoem/index.js`：
-
-```javascript
-// 替换API调用地址和请求格式
-const response = await axios.post(
-  'https://hunyuan.tencentcloudapi.com/',
-  {
-    // 腾讯混元的请求参数
-  },
-  {
-    headers: {
-      'Authorization': `TENCENTCLOUD_SECRET_ID`,
-      // 其他腾讯云认证头
-    }
-  }
-)
+```bash
+node --test $(rg --files -g '*test.js' -g '!node_modules/**' -g '!miniprogram_npm/**' -g '!output/**' | sort)
 ```
 
-### 云函数配置参数
-
-在 `config.json` 中可调整：
-
-```json
-{
-  "timeout": 60,        // 超时时间（秒）
-  "envVariables": {
-    "ZHIPU_API_KEY": "" // API Key
-  },
-  "memorySize": 256     // 内存大小（MB）
-}
-```
-
-## 💡 常见问题
-
-### Q1: 云函数调用失败？
-**A:** 检查以下几点：
-1. 云开发环境ID是否正确
-2. 云函数是否成功部署
-3. 环境变量 `ZHIPU_API_KEY` 是否配置
-4. 查看云函数日志排查错误
-
-### Q2: AI生成的诗句不符合要求？
-**A:** 可以优化提示词（Prompt）：
-- 在 `index.js` 中修改 `generatePoemWithAI` 函数的提示文本
-- 调整 `temperature` 参数控制创造性（0-1）
-
-### Q3: 图片合成失败？
-**A:** 可能原因：
-1. 原图尺寸过大，建议压缩后上传
-2. Canvas库未正确安装，重新 `npm install canvas`
-3. 云函数内存不足，提高内存配置
-
-### Q4: 保存图片到相册失败？
-**A:** 
-1. 检查用户是否授权相册权限
-2. 引导用户在小程序设置中开启权限
-
-### Q5: 成本问题？
-**A:** 
-- 智谱AI：有免费额度，付费约0.01-0.05元/次
-- 云存储：50GB免费存储
-- 云函数：40万次免费调用
-- 个人开发测试基本免费
-
-## 📊 成本估算
-
-| 服务 | 免费额度 | 付费价格 | 预估成本（日活100人） |
-|------|---------|---------|---------------------|
-| 云存储 | 50GB存储+10GB流量 | 0.01元/GB | 免费 |
-| 云函数 | 40万次调用 | 0.0000167元/次 | 免费 |
-| 智谱AI | 测试额度 | 0.01-0.05元/次 | 30-50元/月 |
-
-## 🎨 自定义优化
-
-### 修改UI颜色主题
-
-在 `app.json` 中修改：
-```json
-{
-  "window": {
-    "navigationBarBackgroundColor": "#667eea" // 修改导航栏颜色
-  }
-}
-```
-
-在各页面的 `.wxss` 中修改渐变色：
-```css
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-```
-
-### 调整古诗格式
-
-在云函数中修改提示词，支持：
-- 五言绝句（当前）
-- 七言绝句
-- 五言律诗
-- 自由诗
-
-### 添加更多功能
-
-可扩展功能：
-- [ ] 历史记录保存
-- [ ] 多种诗词格式选择
-- [ ] 背景模板选择
-- [ ] 字体样式切换
-- [ ] 诗词解析功能
-
-## 📝 开发日志
-
-- **v1.0.0** (2024-11-18)
-  - ✅ 基础功能开发完成
-  - ✅ 智谱AI集成
-  - ✅ 图片合成功能
-  - ✅ 保存和分享功能
-
-## 📄 许可证
-
-MIT License
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📮 联系方式
-
-如有问题，欢迎反馈。
-
----
-
-**祝你开发愉快！让每一张照片都成为诗。** ✨
+除自动测试外，真机应覆盖头像与昵称更新、创作、同图重新创作后删除其中一份作品、作品分页、分享和扫码打开分享页。

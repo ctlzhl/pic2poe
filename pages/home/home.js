@@ -1,10 +1,5 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
-
-const formatDate = (timestamp) => {
-  const date = new Date(timestamp || 0)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
-}
+const { formatDotDate } = require('../../utils/date')
 
 Page({
   data: { posts: [], blogLoading: true, blogError: '' },
@@ -18,7 +13,7 @@ Page({
     try {
       const response = await callFunctionWithTimeout('getBlogPosts', { page: 1, pageSize: 3 })
       if (!response.result?.ok) throw new Error(response.result?.message || '博客暂时无法加载，请稍后再试。')
-      const posts = (response.result.data?.posts || []).map((post) => ({ ...post, publishedLabel: formatDate(post.publishedAt) }))
+      const posts = (response.result.data?.posts || []).map((post) => ({ ...post, publishedLabel: formatDotDate(post.publishedAt) }))
       this.setData({ posts })
     } catch (error) {
       console.error('加载首页博客失败:', error)

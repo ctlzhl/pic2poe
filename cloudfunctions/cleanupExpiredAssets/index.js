@@ -1,4 +1,5 @@
 const cloud = require('wx-server-sdk')
+const { assertFilesDeleted } = require('./cleanup-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -8,7 +9,8 @@ const command = db.command
 const deleteFiles = async (fileIDs) => {
   const list = fileIDs.filter(Boolean)
   if (list.length === 0) return
-  await cloud.deleteFile({ fileList: list })
+  const result = await cloud.deleteFile({ fileList: list })
+  assertFilesDeleted(result)
 }
 
 const removeAbandonedDraftData = async (assetId) => {
@@ -29,7 +31,7 @@ const cleanupRevokedShareCards = async () => {
   let failures = 0
   for (const share of revoked.data || []) {
     try {
-      await deleteFiles([share.fileId, share.creationFileId])
+      await deleteFiles([share.fileId])
       await db.collection('shareCards').doc(share._id).remove()
       removed += 1
     } catch (error) {

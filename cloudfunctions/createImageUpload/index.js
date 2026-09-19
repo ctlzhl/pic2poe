@@ -1,5 +1,6 @@
 const cloud = require('wx-server-sdk')
 const { randomUUID } = require('node:crypto')
+const { createStagingPath } = require('./upload-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -22,7 +23,7 @@ exports.main = async (event = {}) => {
   // 让 CloudBase 生成数据库文档 ID；暂存对象使用独立随机标识，避免依赖
   // 不同 SDK 版本对自定义文档 ID / set() 的兼容差异。
   const stagingToken = randomUUID()
-  const stagingPath = `users/${openid}/staging/${stagingToken}.${extension}`
+  const stagingPath = createStagingPath(openid, stagingToken, extension)
   try {
     const result = await db.collection('imageAssets').add({
       data: {

@@ -1,4 +1,4 @@
-const { HIDDEN_CATEGORY_IDS, normalizeCategories, normalizePost } = require('./blog-core')
+const { HIDDEN_CATEGORY_IDS, isHiddenPost, normalizeCategories, normalizePost } = require('./blog-core')
 
 const WORDPRESS_API_BASE = String(process.env.WORDPRESS_API_BASE || 'https://shengxiluo.me/wp-json/wp/v2').replace(/\/$/, '')
 const CACHE_TTL_MS = 5 * 60 * 1000
@@ -55,6 +55,7 @@ exports.main = async (event = {}) => {
       const postId = Number(event.postId)
       if (!Number.isInteger(postId) || postId <= 0) return fail('INVALID_POST', '文章不存在或已下线。')
       const result = await withCache(`detail:${postId}`, () => fetchJson(`/posts/${postId}?_embed=1`))
+      if (isHiddenPost(result.data)) return fail('POST_NOT_FOUND', '文章不存在或已下线。')
       return { ok: true, data: { post: normalizePost(result.data) } }
     }
 

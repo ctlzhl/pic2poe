@@ -1,19 +1,16 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
+const { formatDotDate } = require('../../utils/date')
 
 const TYPE_TITLE = { poem: '五言绝句', review: '图片点评', copy: '配图文案' }
-
-const formatDate = (timestamp) => {
-  const date = new Date(timestamp || 0)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
-}
 
 Page({
   data: {
     profileLoading: true,
     authorized: false,
     authorizing: false,
+    savingProfile: false,
+    nicknameFocused: false,
     profile: {},
     loading: false,
     works: [],
@@ -42,26 +39,71 @@ Page({
     }
   },
 
-  async authorizeProfile() {
-    if (this.data.authorizing) return
-    if (typeof wx.getUserProfile !== 'function') {
-      wx.showToast({ title: '当前微信版本暂不支持资料授权', icon: 'none' })
-      return
-    }
+  onNicknameInput(event) {
+    const nickName = String(event.detail?.value || '').slice(0, 40)
+    this.setData({ 'profile.nickName': nickName })
+  },
+
+  focusNickname() {
+    if (!this.data.nicknameFocused) this.setData({ nicknameFocused: true })
+  },
+
+  async onNicknameBlur(event) {
+    const nickName = String(event.detail?.value || '').trim()
+    this.setData({ nicknameFocused: false })
+    if (!nickName) return
+    this.setData({ 'profile.nickName': nickName })
+    await this.saveProfile({ nickName })
+  },
+
+  async onChooseAvatar(event) {
+    const filePath = event.detail?.avatarUrl
+    if (!filePath || this.data.authorizing) return
     this.setData({ authorizing: true })
     try {
-      const result = await wx.getUserProfile({ desc: '用于展示你的创作资料' })
-      const response = await callFunctionWithTimeout('userProfile', { action: 'save', profile: result.userInfo })
-      if (!response.result?.ok) throw new Error(response.result?.message || '登录资料保存失败，请稍后再试。')
-      this.setData({ authorized: true, profile: response.result.data.profile || {} })
-      await this.loadRecentWorks()
+      const targetResponse = await callFunctionWithTimeout('userProfile', { action: 'createAvatarUpload' })
+      if (!targetResponse.result?.ok || !targetResponse.result.data?.cloudPath) throw new Error(targetResponse.result?.message || '头像上传任务创建失败，请稍后再试。')
+      const uploadResult = await wx.cloud.uploadFile({ cloudPath: targetResponse.result.data.cloudPath, filePath })
+      if (!uploadResult?.fileID) throw new Error('头像上传失败，请稍后再试。')
+      await this.saveProfile({ avatarFileId: uploadResult.fileID })
+      if (!this.data.profile.nickName) this.setData({ nicknameFocused: true })
     } catch (error) {
-      if (error?.errMsg?.includes('deny') || error?.errMsg?.includes('cancel')) return
-      console.error('微信资料授权失败:', error)
-      showErrorToast(error, '微信授权失败，请稍后再试。')
+      console.error('微信头像授权失败:', error)
+      showErrorToast(error, '头像授权失败，请稍后再试。')
     } finally {
       this.setData({ authorizing: false })
     }
+  },
+
+  async saveProfile(changes) {
+    this.pendingProfileChanges = { ...this.pendingProfileChanges, ...changes }
+    if (this.profileSavePromise) return this.profileSavePromise
+
+    this.profileSavePromise = (async () => {
+      let authorized = this.data.authorized
+      this.setData({ savingProfile: true })
+      try {
+        while (Object.keys(this.pendingProfileChanges).length) {
+          const profileChanges = this.pendingProfileChanges
+          this.pendingProfileChanges = {}
+          const response = await callFunctionWithTimeout('userProfile', { action: 'save', profile: profileChanges })
+          if (!response.result?.ok) throw new Error(response.result?.message || '登录资料保存失败，请稍后再试。')
+          authorized = Boolean(response.result.data?.authorized)
+          this.setData({
+            authorized,
+            profile: { ...(response.result.data?.profile || {}), ...this.pendingProfileChanges }
+          })
+        }
+        if (authorized) await this.loadRecentWorks()
+      } catch (error) {
+        console.error('微信资料保存失败:', error)
+        showErrorToast(error, '资料保存失败，请稍后再试。')
+      } finally {
+        this.setData({ savingProfile: false })
+        this.profileSavePromise = null
+      }
+    })()
+    return this.profileSavePromise
   },
 
   async loadRecentWorks() {
@@ -72,7 +114,7 @@ Page({
       const works = (response.result.data?.works || []).map((work) => ({
         ...work,
         typeTitle: TYPE_TITLE[work.type] || '创作结果',
-        createdLabel: formatDate(work.createdAt)
+        createdLabel: formatDotDate(work.createdAt)
       }))
       this.setData({ works, totalWorks: Number(response.result.data?.total || works.length) })
     } catch (error) {

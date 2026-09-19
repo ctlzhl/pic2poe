@@ -1,9 +1,5 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
-
-const formatDate = (timestamp) => {
-  const date = new Date(timestamp || 0)
-  return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
-}
+const { formatDotDate } = require('../../utils/date')
 
 Page({
   data: {
@@ -16,7 +12,11 @@ Page({
     selectedCategoryId: ''
   },
 
-  onLoad() { this.loadCategories(); this.loadMore() },
+  onLoad() {
+    this.requestVersion = 1
+    this.loadCategories()
+    this.loadMore({ requestVersion: this.requestVersion })
+  },
 
   async loadCategories() {
     try {
@@ -29,31 +29,41 @@ Page({
     }
   },
 
-  async loadMore() {
-    if (this.data.loading || !this.data.hasMore) return
+  async loadMore({ force = false, requestVersion = this.requestVersion || 0 } = {}) {
+    if ((!force && this.data.loading) || !this.data.hasMore) return
     const page = this.data.page + 1
+    const categoryId = this.data.selectedCategoryId
     this.setData({ loading: true, errorMessage: '' })
     try {
       const payload = { page, pageSize: 10 }
-      if (this.data.selectedCategoryId) payload.categoryId = this.data.selectedCategoryId
+      if (categoryId) payload.categoryId = categoryId
       const response = await callFunctionWithTimeout('getBlogPosts', payload)
       if (!response.result?.ok) throw new Error(response.result?.message || '博客暂时无法加载，请稍后再试。')
-      const posts = (response.result.data?.posts || []).map((post) => ({ ...post, publishedLabel: formatDate(post.publishedAt) }))
+      if (requestVersion !== this.requestVersion || categoryId !== this.data.selectedCategoryId) return
+      const posts = (response.result.data?.posts || []).map((post) => ({ ...post, publishedLabel: formatDotDate(post.publishedAt) }))
       this.setData({ posts: this.data.posts.concat(posts), page, hasMore: Boolean(response.result.data?.hasMore) })
     } catch (error) {
+      if (requestVersion !== this.requestVersion) return
       console.error('加载博客列表失败:', error)
       this.setData({ errorMessage: error.message || '博客暂时无法加载，请稍后再试。' })
     } finally {
-      this.setData({ loading: false })
+      if (requestVersion === this.requestVersion) this.setData({ loading: false })
     }
   },
 
   selectCategory(event) {
     const categoryId = Number(event.currentTarget.dataset.categoryId) || ''
     if (categoryId === this.data.selectedCategoryId) return
-    this.setData({ selectedCategoryId: categoryId, posts: [], page: 0, hasMore: true, errorMessage: '' })
-    this.loadMore()
+    const requestVersion = (this.requestVersion || 0) + 1
+    this.requestVersion = requestVersion
+    this.setData({ selectedCategoryId: categoryId, posts: [], page: 0, hasMore: true, loading: false, errorMessage: '' })
+    this.loadMore({ force: true, requestVersion })
   },
-  reload() { this.setData({ posts: [], page: 0, hasMore: true }); this.loadMore() },
+  reload() {
+    const requestVersion = (this.requestVersion || 0) + 1
+    this.requestVersion = requestVersion
+    this.setData({ posts: [], page: 0, hasMore: true, loading: false })
+    this.loadMore({ force: true, requestVersion })
+  },
   openPost(event) { const postId = event.currentTarget.dataset.postId; if (postId) wx.navigateTo({ url: `/pages/blog-detail/blog-detail?postId=${postId}` }) }
 })

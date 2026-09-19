@@ -23,11 +23,20 @@ test('首页将创作说明呈现为一行三步向导', () => {
   assert.equal((source.match(/class="guide-arrow"/g) || []).length, 2)
 })
 
-test('我的页头像与昵称资料区可触发微信资料授权', () => {
+test('我的页通过微信标准头像与昵称控件编辑资料', () => {
   const source = readPageFile('my/my.wxml')
+  const script = readPageFile('my/my.js')
+  const style = readPageFile('my/my.wxss')
 
-  const authorizationEntrances = source.match(/class="profile-tap"\s+bindtap="authorizeProfile"/g) || []
-
-  assert.equal(authorizationEntrances.length, 2)
-  assert.match(source, /class="profile-name">点击授权登录<\/view>/)
+  assert.match(source, /open-type="chooseAvatar"/)
+  assert.match(source, /type="nickname"/)
+  assert.match(source, /bindchooseavatar="onChooseAvatar"/)
+  assert.match(source, /focus="\{\{nicknameFocused\}\}"/)
+  assert.match(source, /bindtap="focusNickname"/)
+  assert.match(script, /focusNickname\(\)/)
+  assert.match(script, /saveProfile\(\{ avatarFileId: uploadResult\.fileID \}\)/)
+  assert.doesNotMatch(script, /\|\| '微信用户'/)
+  assert.match(style, /\.avatar-button\s*\{[\s\S]*?width:\s*92rpx;[\s\S]*?min-width:\s*0;/)
+  assert.match(style, /\.profile-info\s*\{[\s\S]*?margin-left:\s*8rpx;/)
+  assert.doesNotMatch(script, /wx\.getUserProfile/)
 })

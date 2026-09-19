@@ -1,20 +1,11 @@
 const cloud = require('wx-server-sdk')
+const { getModelConfig, poemGenerationModel } = require('./model-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const ACTIVE_STATUSES = new Set(['analyzing', 'generating', 'validating'])
 const FAILABLE_STATUSES = new Set(['queued', 'analyzing', 'generating', 'validating'])
-const DEFAULT_MODEL_CONFIG = {
-  promptVersion: 'p1-20260903',
-  requestTimeoutMs: 18000,
-  maxRetries: 1,
-  visionTemperature: 0.2,
-  generationTemperature: 0.7,
-  visionMaxTokens: 500,
-  generationMaxTokens: 600
-}
-
 const SAFETY_SYSTEM_PROMPT = [
   '你是面向普通用户的中文照片创作助手。',
   '只描述图片中可合理观察到的内容；不得虚构具体人物身份、关系、地点或经历，也不得推断敏感属性。',
@@ -25,35 +16,6 @@ const SAFETY_SYSTEM_PROMPT = [
 
 const fail = (code, message) => ({ ok: false, code, message })
 const newId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-
-const readNumberConfig = (name, fallback, min, max, integer = false) => {
-  const value = Number(process.env[name])
-  if (!Number.isFinite(value)) return fallback
-  const normalized = Math.min(max, Math.max(min, value))
-  return integer ? Math.round(normalized) : normalized
-}
-
-const getModelConfig = () => ({
-  qwen: {
-    apiKey: process.env.DASHSCOPE_API_KEY || '',
-    baseUrl: process.env.DASHSCOPE_BASE_URL || '',
-    model: process.env.QWEN_VISION_MODEL || ''
-  },
-  glm: {
-    apiKey: process.env.ZHIPU_API_KEY || '',
-    baseUrl: process.env.GLM_BASE_URL || '',
-    model: process.env.GLM_TEXT_MODEL || ''
-  },
-  settings: {
-    promptVersion: String(process.env.MODEL_PROMPT_VERSION || DEFAULT_MODEL_CONFIG.promptVersion).slice(0, 80),
-    requestTimeoutMs: readNumberConfig('MODEL_REQUEST_TIMEOUT_MS', DEFAULT_MODEL_CONFIG.requestTimeoutMs, 3000, 25000, true),
-    maxRetries: readNumberConfig('MODEL_MAX_RETRIES', DEFAULT_MODEL_CONFIG.maxRetries, 0, 1, true),
-    visionTemperature: readNumberConfig('VISION_TEMPERATURE', DEFAULT_MODEL_CONFIG.visionTemperature, 0, 1, false),
-    generationTemperature: readNumberConfig('GENERATION_TEMPERATURE', DEFAULT_MODEL_CONFIG.generationTemperature, 0, 1, false),
-    visionMaxTokens: readNumberConfig('VISION_MAX_TOKENS', DEFAULT_MODEL_CONFIG.visionMaxTokens, 100, 1200, true),
-    generationMaxTokens: readNumberConfig('GENERATION_MAX_TOKENS', DEFAULT_MODEL_CONFIG.generationMaxTokens, 100, 1600, true)
-  }
-})
 
 const cleanJson = (value) => {
   const text = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
@@ -70,7 +32,7 @@ const extractContent = (payload) => {
   throw new Error('模型响应缺少内容')
 }
 
-const callChat = async ({ provider, baseUrl, apiKey, model, messages, temperature, maxTokens, timeoutMs }) => {
+const callChat = async ({ baseUrl, apiKey, model, messages, temperature, maxTokens, timeoutMs }) => {
   if (!baseUrl || !apiKey || !model) throw new Error('模型服务尚未配置')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
@@ -87,7 +49,7 @@ const callChat = async ({ provider, baseUrl, apiKey, model, messages, temperatur
         temperature,
         max_tokens: maxTokens,
         stream: false,
-        ...(provider === 'glm' ? { thinking: { type: 'disabled' } } : { enable_thinking: false })
+        enable_thinking: false
       }),
       signal: controller.signal
     })
@@ -142,7 +104,6 @@ const taskError = (error) => {
   if (message === 'INVALID_OUTPUT') return { code: 'INVALID_OUTPUT', message: '这次创作没有完成，请再试一次。' }
   if (message === 'SAFETY_REJECTED') return { code: 'SAFETY_REJECTED', message: '这张照片暂时无法生成内容，请更换一张照片。' }
   if (message === 'QWEN_CONFIG_MISSING') return { code: 'MODEL_CONFIG_MISSING', message: '图片理解模型尚未配置，请联系管理员完成配置。' }
-  if (message === 'GLM_CONFIG_MISSING') return { code: 'MODEL_CONFIG_MISSING', message: '诗歌创作模型尚未配置，请联系管理员完成配置。' }
   if (message.includes('尚未配置')) return { code: 'MODEL_UNAVAILABLE', message: '创作服务暂未准备好，请稍后再试。' }
   if (error?.name === 'AbortError') return { code: 'MODEL_TIMEOUT', message: '这次没有写完，再试一次吧。' }
   return { code: 'MODEL_UNAVAILABLE', message: '创作服务暂时不可用，请稍后再试。' }
@@ -247,12 +208,9 @@ const analyzeImage = async (task, asset, draft, config) => {
 const generateContent = async (task, draft, understanding, config) => {
   const context = JSON.stringify({ understanding, location: draft.location, moment: draft.moment, mood: draft.mood })
   if (draft.generateType === 'poem') {
-    if (!config.glm.apiKey || !config.glm.baseUrl || !config.glm.model) {
-      throw new Error('GLM_CONFIG_MISSING')
-    }
+    const model = poemGenerationModel(config)
     const result = await callWithRetry(task, config, () => callChat({
-      provider: 'glm',
-      ...config.glm,
+      ...model,
       temperature: config.settings.generationTemperature,
       maxTokens: config.settings.generationMaxTokens,
       timeoutMs: config.settings.requestTimeoutMs,
@@ -265,7 +223,7 @@ const generateContent = async (task, draft, understanding, config) => {
     if (content?.safe === false) throw new Error('SAFETY_REJECTED')
     return {
       content: validateContent('poem', content),
-      modelMeta: { provider: 'glm', model: config.glm.model, usage: result.usage, retryCount: result.retryCount }
+      modelMeta: { provider: 'qwen', model: model.model, usage: result.usage, retryCount: result.retryCount }
     }
   }
 
@@ -273,7 +231,6 @@ const generateContent = async (task, draft, understanding, config) => {
     ? '{"type":"review","review":{"headline":"","body":"40到80字","observations":["",""]}}'
     : '{"type":"copy","copy":{"label":"","headline":"","body":"","hashtags":["#", "#"]}}'
   const result = await callWithRetry(task, config, () => callChat({
-    provider: 'qwen',
     ...config.qwen,
     temperature: config.settings.generationTemperature,
     maxTokens: config.settings.generationMaxTokens,
@@ -333,7 +290,7 @@ exports.main = async (event = {}) => {
       throw new Error('INVALID_OUTPUT')
     }
     assertNotTimedOut(task)
-    const config = getModelConfig()
+  const config = getModelConfig()
     const reusableAnalysis = await findReusableUnderstanding(task.draftId, openid)
     const analysis = reusableAnalysis
       ? { understanding: reusableAnalysis.photoUnderstanding, reused: true, modelMeta: reusableAnalysis.modelMeta?.analysis || null }
