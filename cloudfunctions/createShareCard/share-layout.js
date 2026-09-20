@@ -5,6 +5,13 @@ const PHOTO_MIN_WIDTH = 720
 const PHOTO_MAX_WIDTH = 1000
 const QR_SIZE = 150
 
+const editorialTypography = () => ({
+  label: { fontSize: 28, lineHeight: 36 },
+  title: { fontSize: 56, lineHeight: 74 },
+  body: { fontSize: 36, lineHeight: 56 },
+  tags: { fontSize: 28, lineHeight: 36 }
+})
+
 const landscapePoemLayout = () => ({
   photo: {
     left: 0,
@@ -65,4 +72,4 @@ const portraitPoemLayout = ({ titleLineCount = 1, poemLineCount = 4, imageAspect
   }
 }
 
-module.exports = { landscapePoemLayout, portraitPoemLayout }
+module.exports = { landscapePoemLayout, portraitPoemLayout, editorialTypography }

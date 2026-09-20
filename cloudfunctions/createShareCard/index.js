@@ -1,6 +1,6 @@
 const crypto = require('node:crypto')
 const cloud = require('wx-server-sdk')
-const { landscapePoemLayout, portraitPoemLayout } = require('./share-layout')
+const { landscapePoemLayout, portraitPoemLayout, editorialTypography } = require('./share-layout')
 const { canCreateShareForWork } = require('./share-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
@@ -8,7 +8,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const CANVAS_WIDTH = 1440
 const CANVAS_HEIGHT = 1800
-const TEMPLATE_VERSION = 'share-v5'
+const TEMPLATE_VERSION = 'share-v6'
 const CARD_TOP_GAP = 48
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
@@ -227,12 +227,13 @@ const renderEditorialCard = async (work, source, qr) => {
   const bodyLines = wrapText(body, isReview ? 24 : 24, isReview ? 3 : 4)
   const tagLine = Array.isArray(tags) ? truncate(tags.filter(Boolean).slice(0, 2).join('  '), 30) : ''
   const textTop = photoHeight + 84
+  const typography = editorialTypography()
   const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="${photoHeight}" width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT - photoHeight}" fill="#f7f1e7"/>
-    ${svgText([truncate(label, 18)], { x: 84, y: textTop, fontSize: 26, lineHeight: 32, fill: '#74826f', weight: 700 })}
-    ${svgText(titleLines, { x: 84, y: textTop + 86, fontSize: 52, lineHeight: 68, fill: '#2f3c2e', weight: 700 })}
-    ${svgText(bodyLines, { x: 84, y: textTop + 86 + titleLines.length * 68 + 48, fontSize: 32, lineHeight: 50, fill: '#526052' })}
-    ${svgText(tagLine ? [tagLine] : [], { x: 84, y: 1710, fontSize: 26, lineHeight: 34, fill: '#74826f' })}
+    ${svgText([truncate(label, 18)], { x: 84, y: textTop, ...typography.label, fill: '#74826f', weight: 700 })}
+    ${svgText(titleLines, { x: 84, y: textTop + 94, ...typography.title, fill: '#2f3c2e', weight: 700 })}
+    ${svgText(bodyLines, { x: 84, y: textTop + 94 + titleLines.length * typography.title.lineHeight + 54, ...typography.body, fill: '#526052' })}
+    ${svgText(tagLine ? [tagLine] : [], { x: 84, y: 1710, ...typography.tags, fill: '#74826f' })}
   </svg>`
   return compose(photo, { left: 0, top: CARD_TOP_GAP }, textSvg, qr, { left: 1206, top: 1600 })
 }

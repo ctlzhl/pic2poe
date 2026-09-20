@@ -1,12 +1,13 @@
 const uploadWithCompensation = async ({ uploads, uploadFile, afterUpload, cleanupFileIds }) => {
-  const results = []
-  const uploadedFileIds = []
+  let uploadedFileIds = []
   try {
-    for (const upload of uploads) {
-      const result = await uploadFile(upload)
-      results.push(result)
-      if (result?.fileID) uploadedFileIds.push(result.fileID)
-    }
+    const settled = await Promise.allSettled(uploads.map((upload) => uploadFile(upload)))
+    const results = settled
+      .filter((result) => result.status === 'fulfilled')
+      .map((result) => result.value)
+    uploadedFileIds = results.map((result) => result?.fileID).filter(Boolean)
+    const failed = settled.find((result) => result.status === 'rejected')
+    if (failed) throw failed.reason
     if (afterUpload) await afterUpload(results)
     return results
   } catch (error) {

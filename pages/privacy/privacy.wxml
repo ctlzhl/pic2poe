@@ -1,7 +1,9 @@
 <view class="page">
   <view class="title">照片与隐私说明</view>
-  <view class="section"><view class="heading">我们如何使用照片</view><view>你选择的照片仅用于图片预处理、内容生成、作品展示和分享图合成。客户端不会直接读取新版业务数据库。</view></view>
-  <view class="section"><view class="heading">保存期限</view><view>原图会在上传 24 小时后进入清理流程；成功作品使用经处理的创作图和缩略图。删除作品后，关联图片、分享图和分享链接均会失效且不可恢复。</view></view>
+  <view class="intro">我们只处理实现「照片有话说」所必需的信息，并在你主动使用相应功能时获取。</view>
+  <view class="section"><view class="heading">照片、相机与相册</view><view>当你主动选择相册照片或拍摄照片时，我们会处理该照片，用于图片预处理、内容生成、作品展示和分享图合成。原图仅保留 24 小时后进入清理流程；经处理的创作图和缩略图会保留至你删除对应作品。</view></view>
+  <view class="section"><view class="heading">头像与昵称</view><view>当你主动授权头像或填写微信昵称时，我们仅将它们用于你的个人资料展示。你可以随时在「我的」页面修改，未授权不影响浏览和创作。</view></view>
+  <view class="section"><view class="heading">账号标识</view><view>云开发会使用微信提供的账号标识区分不同用户的数据，保障作品、照片与分享记录仅由其创建者管理。</view></view>
   <view class="section"><view class="heading">公开分享</view><view>只有你主动分享后，他人才能通过不可猜测的分享凭证查看该作品。分享不公开你的微信身份、原始照片文件或填写的精确地点。</view></view>
-  <view class="section"><view class="heading">你的选择</view><view>你可以随时在“我的作品”中删除作品；相机与相册权限可在微信系统设置中管理。</view></view>
+  <view class="section"><view class="heading">你的选择</view><view>你可以随时在「我的作品」中删除作品；相机与相册权限可在微信系统设置中管理。</view></view>
 </view>

@@ -72,3 +72,34 @@ test('图片处理失败时回收已经上传的暂存文件', async () => {
     else global.wx = previousWx
   }
 })
+
+test('选择图片时只允许一张并默认使用压缩图', async () => {
+  const definition = loadPageDefinition()
+  const previousWx = global.wx
+  let chooseOptions
+  global.wx = {
+    requirePrivacyAuthorize({ success }) { success() },
+    chooseMedia: async (options) => {
+      chooseOptions = options
+      return { tempFiles: [{ tempFilePath: '/tmp/photo.jpg', size: 100 }] }
+    },
+    getImageInfo({ success }) { success({ type: 'jpeg' }) },
+    cloud: {
+      callFunction({ name, success }) {
+        if (name === 'createImageUpload') return success({ result: { ok: true, data: { assetId: 'asset', stagingPath: 'staging/u/photo.jpg' } } })
+        success({ result: { ok: true, data: {} } })
+      },
+      uploadFile({ success }) { success({ fileID: 'cloud://staging.jpg' }) }
+    },
+    showLoading() {}, hideLoading() {}, showToast() {}, showModal() {}
+  }
+  try {
+    const page = createPage(definition, {})
+    await page.chooseImage()
+    assert.equal(chooseOptions.count, 1)
+    assert.deepEqual(chooseOptions.sizeType, ['compressed', 'original'])
+  } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})

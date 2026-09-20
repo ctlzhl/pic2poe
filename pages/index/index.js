@@ -1,6 +1,7 @@
 const { uploadFileWithTimeout, callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
 const { ALLOWED_IMAGE_EXTENSIONS, getImageExtensionFromPath } = require('../../utils/image')
+const { requirePrivacyAuthorization } = require('../../utils/privacy')
 
 const MAX_FILE_SIZE = 6 * 1024 * 1024
 const PREPARE_TIMEOUT = 30000
@@ -70,11 +71,12 @@ Page({
     let loadingShown = false
     let stagingFileId = ''
     try {
+      await requirePrivacyAuthorization()
       const selection = await wx.chooseMedia({
         count: 1,
         mediaType: ['image'],
         sourceType: ['album', 'camera'],
-        sizeType: ['original']
+        sizeType: ['compressed', 'original']
       })
       const file = selection.tempFiles?.[0]
       const tempFilePath = file?.tempFilePath || ''

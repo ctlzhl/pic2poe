@@ -46,3 +46,25 @@ test('派生图片上传后写入资产失败时回收全部文件', async () =>
   )
   assert.deepEqual(deleted, ['cloud://a', 'cloud://b', 'cloud://c'])
 })
+
+test('原图与派生图会并行上传以缩短预处理等待', async () => {
+  const { uploadWithCompensation } = loadCore()
+  const started = []
+  let releaseUploads
+  const uploadsReady = new Promise((resolve) => { releaseUploads = resolve })
+
+  const pending = uploadWithCompensation({
+    uploads: [{ cloudPath: 'original' }, { cloudPath: 'creation' }, { cloudPath: 'thumbnail' }],
+    uploadFile: async ({ cloudPath }) => {
+      started.push(cloudPath)
+      await uploadsReady
+      return { fileID: `cloud://${cloudPath}` }
+    },
+    cleanupFileIds: async () => {}
+  })
+
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(started, ['original', 'creation', 'thumbnail'])
+  releaseUploads()
+  await pending
+})

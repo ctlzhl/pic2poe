@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { landscapePoemLayout, portraitPoemLayout } = require('./share-layout')
+const { landscapePoemLayout, portraitPoemLayout, editorialTypography } = require('./share-layout')
 
 test('横版诗卡的标题与正文以画布中心轴对齐', () => {
   const layout = landscapePoemLayout()
@@ -31,4 +31,13 @@ test('不同竖构图比例都会完整显示且不超出画布', () => {
   assert.ok(Math.abs(phonePortrait.photo.width / phonePortrait.photo.height - 9 / 16) < 0.002)
   assert.equal(longTitle.qr.top, 1580)
   assert.equal(longTitle.qr.left, 1145)
+})
+
+test('图评与文案分享卡使用更易阅读的正文排版', () => {
+  assert.deepEqual(editorialTypography(), {
+    label: { fontSize: 28, lineHeight: 36 },
+    title: { fontSize: 56, lineHeight: 74 },
+    body: { fontSize: 36, lineHeight: 56 },
+    tags: { fontSize: 28, lineHeight: 36 }
+  })
 })
