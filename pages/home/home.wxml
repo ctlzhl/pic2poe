@@ -31,7 +31,7 @@
   <view wx:elif="{{!posts.length}}" class="blog-state">暂时没有可展示的文章。</view>
   <view wx:else class="post-list">
     <view wx:for="{{posts}}" wx:key="id" class="post-card" data-post-id="{{item.id}}" bindtap="openPost">
-      <image wx:if="{{item.featuredImage}}" class="post-cover" src="{{item.featuredImage}}" mode="aspectFill"></image>
+      <image wx:if="{{item.featuredImage}}" class="post-cover" src="{{item.featuredImage}}" mode="aspectFill" lazy-load></image>
       <view wx:else class="post-cover placeholder"></view>
       <view class="post-body">
         <view class="post-meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>

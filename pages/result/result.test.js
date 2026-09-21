@@ -57,6 +57,25 @@ test('点击保存分享会直接打开已就绪图片的原生分享菜单', as
   }
 })
 
+test('结果页启用分享给好友和分享到朋友圈入口', () => {
+  const definition = loadPageDefinition()
+  const page = createPage(definition)
+  const originalWx = global.wx
+  let options
+  global.wx = { showShareMenu(value) { options = value } }
+
+  try {
+    page.onLoad({})
+    assert.deepEqual(options, {
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})
+
 test('原生图片分享菜单调用失败时提示在真机预览中重试', async () => {
   const definition = loadPageDefinition()
   const page = createPage(definition, {

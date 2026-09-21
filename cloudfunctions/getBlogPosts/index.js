@@ -2,6 +2,7 @@ const { HIDDEN_CATEGORY_IDS, isHiddenPost, normalizeCategories, normalizePost } 
 
 const WORDPRESS_API_BASE = String(process.env.WORDPRESS_API_BASE || 'https://shengxiluo.me/wp-json/wp/v2').replace(/\/$/, '')
 const CACHE_TTL_MS = 5 * 60 * 1000
+const CATEGORY_CACHE_TTL_MS = 60 * 60 * 1000
 const cache = new Map()
 
 const fail = (code, message) => ({ ok: false, code, message })
@@ -9,7 +10,8 @@ const fail = (code, message) => ({ ok: false, code, message })
 const buildListPath = ({ page, pageSize, categoryId } = {}) => {
   const selectedCategoryId = Number(categoryId)
   const categoryQuery = Number.isInteger(selectedCategoryId) && selectedCategoryId > 0 ? `&categories=${selectedCategoryId}` : ''
-  return `/posts?_embed=1&per_page=${pageSize}&page=${page}&orderby=date&order=desc&categories_exclude=${HIDDEN_CATEGORY_IDS.join(',')}${categoryQuery}`
+  // 列表无需正文 HTML；WordPress 默认会带回完整正文，体积会随文章长度明显增加。
+  return `/posts?_embed=1&_fields=id,date,title,excerpt,_embedded&per_page=${pageSize}&page=${page}&orderby=date&order=desc&categories_exclude=${HIDDEN_CATEGORY_IDS.join(',')}${categoryQuery}`
 }
 
 const fetchJson = async (path) => {
@@ -32,14 +34,14 @@ const fromCache = (key) => {
   return entry && entry.expiresAt > Date.now() ? entry.data : null
 }
 
-const withCache = async (key, request) => {
+const withCache = async (key, request, ttlMs = CACHE_TTL_MS) => {
   const cached = fromCache(key)
   if (cached) return cached
   let lastError
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const data = await request()
-      cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS })
+      cache.set(key, { data, expiresAt: Date.now() + ttlMs })
       return data
     } catch (error) {
       lastError = error
@@ -60,7 +62,11 @@ exports.main = async (event = {}) => {
     }
 
     if (action === 'categories') {
-      const result = await withCache('categories', () => fetchJson('/categories?per_page=100&hide_empty=true&orderby=count&order=desc'))
+      const result = await withCache(
+        'categories',
+        () => fetchJson('/categories?per_page=100&hide_empty=true&orderby=count&order=desc'),
+        CATEGORY_CACHE_TTL_MS
+      )
       return { ok: true, data: { categories: normalizeCategories(result.data) } }
     }
 

@@ -19,7 +19,7 @@
   <view wx:else class="work-list">
     <view wx:for="{{works}}" wx:key="workId" class="work-card">
       <view class="work-main" data-work-id="{{item.workId}}" bindtap="openWork">
-        <image wx:if="{{item.thumbnailUrl}}" class="thumbnail" src="{{item.thumbnailUrl}}" mode="aspectFill"></image>
+        <image wx:if="{{item.thumbnailUrl}}" class="thumbnail" src="{{item.thumbnailUrl}}" mode="aspectFill" lazy-load></image>
         <view wx:else class="thumbnail placeholder">照片</view>
         <view class="work-copy">
           <view class="work-meta">{{item.typeTitle}} · {{item.createdLabel}}</view>

@@ -5,6 +5,10 @@ Page({
   data: { posts: [], blogLoading: true, blogError: '' },
 
   onLoad() {
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
     this.loadLatestPosts()
   },
 
@@ -34,5 +38,16 @@ Page({
   openPost(event) {
     const postId = event.currentTarget.dataset.postId
     if (postId) wx.navigateTo({ url: `/pages/blog-detail/blog-detail?postId=${postId}` })
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '照片有话说，把此刻写下来',
+      path: '/pages/home/home'
+    }
+  },
+
+  onShareTimeline() {
+    return { title: '照片有话说，把此刻写下来' }
   }
 })

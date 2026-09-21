@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "照片有话说"
+  "navigationBarTitleText": "照片有话说",
+  "enableShareTimeline": true
 }

@@ -8,7 +8,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const CANVAS_WIDTH = 1440
 const CANVAS_HEIGHT = 1800
-const TEMPLATE_VERSION = 'share-v6'
+const TEMPLATE_VERSION = 'share-v7'
 const CARD_TOP_GAP = 48
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
@@ -217,22 +217,23 @@ const renderPoemCard = async (work, source, metadata, qr) => {
 
 const renderEditorialCard = async (work, source, qr) => {
   const isReview = work.type === 'review'
-  const photoHeight = isReview ? 1040 : 900
+  // 把空间让给正文，移动端分享时无需依赖缩放才看清文字。
+  const photoHeight = isReview ? 990 : 860
   const photo = await renderPhoto(source, CANVAS_WIDTH, photoHeight - CARD_TOP_GAP)
   const headline = isReview ? work.content?.review?.headline : work.content?.copy?.headline
   const body = isReview ? work.content?.review?.body : work.content?.copy?.body
   const label = isReview ? '图片点评' : (work.content?.copy?.label || '配图文案')
   const tags = isReview ? work.content?.review?.observations : work.content?.copy?.hashtags
-  const titleLines = wrapText(headline, 16, 2)
-  const bodyLines = wrapText(body, isReview ? 24 : 24, isReview ? 3 : 4)
+  const titleLines = wrapText(headline, 14, 2)
+  const bodyLines = wrapText(body, 21, isReview ? 3 : 4)
   const tagLine = Array.isArray(tags) ? truncate(tags.filter(Boolean).slice(0, 2).join('  '), 30) : ''
-  const textTop = photoHeight + 84
+  const textTop = photoHeight + 76
   const typography = editorialTypography()
   const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="${photoHeight}" width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT - photoHeight}" fill="#f7f1e7"/>
     ${svgText([truncate(label, 18)], { x: 84, y: textTop, ...typography.label, fill: '#74826f', weight: 700 })}
-    ${svgText(titleLines, { x: 84, y: textTop + 94, ...typography.title, fill: '#2f3c2e', weight: 700 })}
-    ${svgText(bodyLines, { x: 84, y: textTop + 94 + titleLines.length * typography.title.lineHeight + 54, ...typography.body, fill: '#526052' })}
+    ${svgText(titleLines, { x: 84, y: textTop + 100, ...typography.title, fill: '#2f3c2e', weight: 700 })}
+    ${svgText(bodyLines, { x: 84, y: textTop + 100 + titleLines.length * typography.title.lineHeight + 64, ...typography.body, fill: '#526052' })}
     ${svgText(tagLine ? [tagLine] : [], { x: 84, y: 1710, ...typography.tags, fill: '#74826f' })}
   </svg>`
   return compose(photo, { left: 0, top: CARD_TOP_GAP }, textSvg, qr, { left: 1206, top: 1600 })

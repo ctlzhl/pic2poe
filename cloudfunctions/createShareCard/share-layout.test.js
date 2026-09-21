@@ -35,9 +35,9 @@ test('不同竖构图比例都会完整显示且不超出画布', () => {
 
 test('图评与文案分享卡使用更易阅读的正文排版', () => {
   assert.deepEqual(editorialTypography(), {
-    label: { fontSize: 28, lineHeight: 36 },
-    title: { fontSize: 56, lineHeight: 74 },
-    body: { fontSize: 36, lineHeight: 56 },
-    tags: { fontSize: 28, lineHeight: 36 }
+    label: { fontSize: 30, lineHeight: 40 },
+    title: { fontSize: 64, lineHeight: 84 },
+    body: { fontSize: 42, lineHeight: 64 },
+    tags: { fontSize: 30, lineHeight: 40 }
   })
 })

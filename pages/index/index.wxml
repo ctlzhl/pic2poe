@@ -16,7 +16,7 @@
         <view class="empty-desc">支持 JPG、PNG、WebP，最大 6MB</view>
       </view>
     </view>
-    <view wx:if="{{preparing}}" class="image-status">正在优化图片…</view>
+    <view wx:if="{{preparing}}" class="image-status">{{prepareMessage || '正在准备图片…'}}</view>
     <view wx:elif="{{prepareState === 'ready'}}" class="image-status ready">图片已准备好</view>
     <view wx:if="{{imageUrl && !preparing}}" class="change-mask">点击更换图片</view>
   </view>

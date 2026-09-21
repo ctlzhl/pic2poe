@@ -25,7 +25,7 @@
       <view class="section-head"><view>我的作品（{{totalWorks}}）</view><view class="all-link" bindtap="openAllWorks">查看全部</view></view>
       <view class="grid">
         <view wx:for="{{works}}" wx:key="workId" class="card" data-work-id="{{item.workId}}" bindtap="openWork">
-          <image wx:if="{{item.thumbnailUrl}}" class="thumb" src="{{item.thumbnailUrl}}" mode="aspectFill"></image>
+          <image wx:if="{{item.thumbnailUrl}}" class="thumb" src="{{item.thumbnailUrl}}" mode="aspectFill" lazy-load></image>
           <view wx:else class="thumb placeholder">照片</view>
           <view class="card-type">{{item.typeTitle}}</view>
           <view class="card-title">{{item.title}}</view>

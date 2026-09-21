@@ -21,7 +21,14 @@ test('normalizePost 清洗 WordPress HTML 并提取文章展示字段', () => {
     excerpt: { rendered: '<p>一段 <strong>被保留</strong> 的摘要。</p><script>alert(1)</script>' },
     content: { rendered: '<h2>标题</h2><p>正文 <a href="javascript:alert(1)">链接</a></p><iframe src="bad"></iframe>' },
     _embedded: {
-      'wp:featuredmedia': [{ source_url: 'https://cdn.example.com/post.jpg' }],
+      'wp:featuredmedia': [{
+        source_url: 'https://cdn.example.com/post-original.jpg',
+        media_details: {
+          sizes: {
+            medium_large: { source_url: 'https://cdn.example.com/post-768.jpg' }
+          }
+        }
+      }],
       'wp:term': [[{ name: '旅行' }]]
     }
   })
@@ -31,10 +38,21 @@ test('normalizePost 清洗 WordPress HTML 并提取文章展示字段', () => {
     title: '秋日&光',
     excerpt: '一段 被保留 的摘要。',
     contentHtml: '<h2>标题</h2><p>正文 <a>链接</a></p>',
-    featuredImage: 'https://cdn.example.com/post.jpg',
+    featuredImage: 'https://cdn.example.com/post-768.jpg',
     categoryName: '旅行',
     publishedAt: '2026-09-14T09:30:00'
   })
+})
+
+test('normalizePost 没有合适的缩略图时保留特色图原地址', () => {
+  const { normalizePost } = loadCore()
+  const post = normalizePost({
+    id: 13,
+    title: { rendered: '原图回退' },
+    _embedded: { 'wp:featuredmedia': [{ source_url: 'https://cdn.example.com/post-original.jpg' }] }
+  }, { includeContent: false })
+
+  assert.equal(post.featuredImage, 'https://cdn.example.com/post-original.jpg')
 })
 
 test('sanitizeContentHtml 让正文图片按容器宽度等比例展示', () => {

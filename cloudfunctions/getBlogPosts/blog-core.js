@@ -75,6 +75,16 @@ const getCategoryName = (embedded = {}) => {
   return String(terms[0]?.name || '').trim()
 }
 
+const getFeaturedImage = (media = {}) => {
+  const sizes = media?.media_details?.sizes || {}
+  const preferredSizes = ['medium_large', 'large', 'medium']
+  for (const size of preferredSizes) {
+    const url = safeUrl(sizes?.[size]?.source_url)
+    if (url) return url
+  }
+  return safeUrl(media?.source_url || '')
+}
+
 const normalizeCategories = (categories = []) => (Array.isArray(categories) ? categories : [])
   .map((category) => ({
     id: Number(category?.id) || 0,
@@ -93,7 +103,8 @@ const normalizePost = (post = {}, { includeContent = true } = {}) => {
     title: stripInlineHtml(post.title?.rendered || '未命名文章'),
     excerpt,
     contentHtml,
-    featuredImage: safeUrl(media?.source_url || ''),
+    // 列表与详情都优先使用适合移动端的 WordPress 衍生图，避免拉取原始大图。
+    featuredImage: getFeaturedImage(media),
     categoryName: getCategoryName(embedded),
     publishedAt: String(post.date || '')
   }

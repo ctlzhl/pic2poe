@@ -103,3 +103,89 @@ test('选择图片时只允许一张并默认使用压缩图', async () => {
     else global.wx = previousWx
   }
 })
+
+test('离开创作页后清空未提交的图片与创作草稿', () => {
+  const definition = loadPageDefinition()
+  const previousWx = global.wx
+  global.wx = { hideLoading() {} }
+  const page = createPage(definition, {
+    imageUrl: '/tmp/photo.jpg',
+    assetId: 'asset-1',
+    idempotencyKey: 'create-1',
+    prepareState: 'ready',
+    prepareMessage: '图片已准备好',
+    preparing: false,
+    generateType: 'review',
+    mood: 'warm',
+    location: '西湖',
+    moment: '散步'
+  })
+
+  try {
+    page.onHide()
+
+    assert.deepEqual({
+      imageUrl: page.data.imageUrl,
+      assetId: page.data.assetId,
+      idempotencyKey: page.data.idempotencyKey,
+      prepareState: page.data.prepareState,
+      prepareMessage: page.data.prepareMessage,
+      generateType: page.data.generateType,
+      mood: page.data.mood,
+      location: page.data.location,
+      moment: page.data.moment
+    }, {
+      imageUrl: '',
+      assetId: '',
+      idempotencyKey: '',
+      prepareState: 'idle',
+      prepareMessage: '',
+      generateType: 'poem',
+      mood: 'auto',
+      location: '',
+      moment: ''
+    })
+  } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})
+
+test('离开创作页后，仍在上传的旧图片不能回写到新首屏', async () => {
+  const definition = loadPageDefinition()
+  const previousWx = global.wx
+  let finishUpload
+  const deleted = []
+  global.wx = {
+    chooseMedia: async () => ({ tempFiles: [{ tempFilePath: '/tmp/photo.jpg', size: 100 }] }),
+    cloud: {
+      callFunction({ name, success }) {
+        if (name === 'createImageUpload') {
+          success({ result: { ok: true, data: { assetId: 'asset-1', stagingPath: 'staging/u/photo.jpg' } } })
+          return
+        }
+        throw new Error('离开页面后不应继续处理图片')
+      },
+      uploadFile({ success }) { finishUpload = () => success({ fileID: 'cloud://staging.jpg' }) },
+      deleteFile: async ({ fileList }) => { deleted.push(...fileList) }
+    },
+    showLoading() {}, hideLoading() {}, showToast() {}, showModal() {}
+  }
+
+  try {
+    const page = createPage(definition, {})
+    const choosing = page.chooseImage()
+    while (!finishUpload) await Promise.resolve()
+    page.onHide()
+    finishUpload()
+    await choosing
+
+    assert.equal(page.data.imageUrl, '')
+    assert.equal(page.data.assetId, '')
+    assert.equal(page.data.prepareState, 'idle')
+    assert.deepEqual(deleted, ['cloud://staging.jpg'])
+  } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})

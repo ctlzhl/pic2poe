@@ -6,10 +6,10 @@ const PHOTO_MAX_WIDTH = 1000
 const QR_SIZE = 150
 
 const editorialTypography = () => ({
-  label: { fontSize: 28, lineHeight: 36 },
-  title: { fontSize: 56, lineHeight: 74 },
-  body: { fontSize: 36, lineHeight: 56 },
-  tags: { fontSize: 28, lineHeight: 36 }
+  label: { fontSize: 30, lineHeight: 40 },
+  title: { fontSize: 64, lineHeight: 84 },
+  body: { fontSize: 42, lineHeight: 64 },
+  tags: { fontSize: 30, lineHeight: 40 }
 })
 
 const landscapePoemLayout = () => ({

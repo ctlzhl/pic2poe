@@ -7,7 +7,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const MAX_BYTES = 6 * 1024 * 1024
 const MAX_PIXELS = 64 * 1000 * 1000
-const CREATION_MAX_EDGE = 2048
+// 创作与分享的最长边为 1440px；1600px 能保留余量，同时显著降低后续上传和模型读取成本。
+const CREATION_MAX_EDGE = 1600
 const THUMBNAIL_MAX_EDGE = 640
 const ORIGINAL_TTL_MS = 24 * 60 * 60 * 1000
 const ALLOWED_FORMATS = new Set(['jpeg', 'png', 'webp'])
@@ -76,8 +77,8 @@ const buildDerivedImages = async (input) => {
     .jpeg({ quality: 86, mozjpeg: true })
     .toBuffer()
 
-  const thumbnailBuffer = await base
-    .clone()
+  // 缩略图从已生成的创作图继续缩放，避免再次解码高像素原图。
+  const thumbnailBuffer = await sharp(creationBuffer)
     .resize({
       width: THUMBNAIL_MAX_EDGE,
       height: THUMBNAIL_MAX_EDGE,

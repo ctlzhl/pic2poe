@@ -48,6 +48,7 @@ Page({
     assetId: '',
     idempotencyKey: '',
     prepareState: 'idle',
+    prepareMessage: '',
     preparing: false,
     submitting: false,
     generateTypes,
@@ -65,11 +66,47 @@ Page({
     })
   },
 
+  resetDraft() {
+    // Tab 页会被缓存；离开后必须清掉本次尚未提交的创作状态。
+    this.prepareRunId = (this.prepareRunId || 0) + 1
+    this.setData({
+      imageUrl: '',
+      assetId: '',
+      idempotencyKey: '',
+      prepareState: 'idle',
+      prepareMessage: '',
+      preparing: false,
+      submitting: false,
+      generateType: 'poem',
+      mood: 'auto',
+      location: '',
+      moment: ''
+    })
+  },
+
+  onHide() {
+    this.resetDraft()
+    wx.hideLoading()
+  },
+
   async chooseImage() {
     if (this.data.preparing || this.data.submitting) return
 
+    const prepareRunId = (this.prepareRunId || 0) + 1
+    this.prepareRunId = prepareRunId
+    const isCurrentRun = () => this.prepareRunId === prepareRunId
     let loadingShown = false
     let stagingFileId = ''
+    const cleanupStagingFile = async () => {
+      if (!stagingFileId) return
+      const fileId = stagingFileId
+      stagingFileId = ''
+      try {
+        await wx.cloud.deleteFile({ fileList: [fileId] })
+      } catch (cleanupError) {
+        console.warn('回收暂存图片失败:', cleanupError)
+      }
+    }
     try {
       await requirePrivacyAuthorization()
       const selection = await wx.chooseMedia({
@@ -81,6 +118,7 @@ Page({
       const file = selection.tempFiles?.[0]
       const tempFilePath = file?.tempFilePath || ''
       if (!tempFilePath) throw new Error('未获取到图片路径')
+      if (!isCurrentRun()) return
       if (file.size > MAX_FILE_SIZE) throw new Error('图片过大，请选择 6MB 以内的图片。')
 
       let extension = ''
@@ -99,48 +137,57 @@ Page({
         return
       }
       if (!extension) throw new Error('暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。')
+      if (!isCurrentRun()) return
 
       this.setData({
         imageUrl: tempFilePath,
         assetId: '',
         idempotencyKey: '',
         prepareState: 'pending',
-        preparing: true
+        preparing: true,
+        prepareMessage: '正在创建上传任务…'
       })
-      wx.showLoading({ title: '正在准备图片…', mask: true })
+      wx.showLoading({ title: '正在创建上传任务…', mask: true })
       loadingShown = true
 
       const uploadTicket = await callFunctionWithTimeout('createImageUpload', { extension })
+      if (!isCurrentRun()) return
       if (!uploadTicket.result?.ok) {
         console.error('createImageUpload 返回失败:', uploadTicket.result)
         throw new Error(getFailureMessage(uploadTicket.result, '创建上传任务失败，请稍后重试。'))
       }
       const { assetId, stagingPath } = uploadTicket.result.data
+      this.setData({ prepareMessage: '正在上传照片…' })
+      wx.showLoading({ title: '正在上传照片…', mask: true })
       const upload = await uploadFileWithTimeout(stagingPath, tempFilePath)
       stagingFileId = upload.fileID
+      if (!isCurrentRun()) {
+        await cleanupStagingFile()
+        return
+      }
+      this.setData({ prepareMessage: '正在优化图片…' })
+      wx.showLoading({ title: '正在优化图片…', mask: true })
       const response = await callFunctionWithTimeout('prepareImage', { assetId, fileID: upload.fileID }, PREPARE_TIMEOUT)
       if (!response.result?.ok) throw new Error(getFailureMessage(response.result, '图片处理失败，请换一张再试。'))
       stagingFileId = ''
+      if (!isCurrentRun()) return
 
       this.setData({
         assetId,
         idempotencyKey: createIdempotencyKey(),
-        prepareState: 'ready'
+        prepareState: 'ready',
+        prepareMessage: '图片已准备好'
       })
     } catch (error) {
       if (error?.errMsg?.includes('cancel')) return
-      if (stagingFileId) {
-        try {
-          await wx.cloud.deleteFile({ fileList: [stagingFileId] })
-        } catch (cleanupError) {
-          console.warn('回收暂存图片失败:', cleanupError)
-        }
-      }
+      await cleanupStagingFile()
+      if (!isCurrentRun()) return
       console.error('上传并处理图片失败:', error)
-      this.setData({ assetId: '', prepareState: 'error' })
+      this.setData({ assetId: '', prepareState: 'error', prepareMessage: '' })
       showErrorToast(error, '图片处理失败，请换一张再试。')
     } finally {
       // 用户在系统选图界面取消时，尚未显示 loading；此时不能调用 hideLoading。
+      if (!isCurrentRun()) return
       if (loadingShown) wx.hideLoading()
       this.setData({ preparing: false })
     }
