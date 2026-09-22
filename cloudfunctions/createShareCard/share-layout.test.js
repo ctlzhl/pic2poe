@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { landscapePoemLayout, portraitPoemLayout, editorialTypography } = require('./share-layout')
+const { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout } = require('./share-layout')
 
 test('横版诗卡的标题与正文以画布中心轴对齐', () => {
   const layout = landscapePoemLayout()
@@ -40,4 +40,23 @@ test('图评与文案分享卡使用更易阅读的正文排版', () => {
     body: { fontSize: 42, lineHeight: 64 },
     tags: { fontSize: 30, lineHeight: 40 }
   })
+})
+
+test('图评与文案的横图和方图使用上图下文版式', () => {
+  assert.equal(editorialLayoutFor({ width: 1600, height: 900 }).kind, 'stacked')
+  assert.equal(editorialLayoutFor({ width: 1200, height: 1200 }).kind, 'stacked')
+})
+
+test('图评与文案的竖图使用左图右文版式，并识别 EXIF 旋转', () => {
+  assert.equal(editorialLayoutFor({ width: 900, height: 1600 }).kind, 'side-by-side')
+  assert.equal(editorialLayoutFor({ width: 1600, height: 900, orientation: 6 }).kind, 'side-by-side')
+})
+
+test('竖图的右侧文字区能容纳既定的标题与正文行宽', () => {
+  const layout = editorialSideBySideLayout({ imageAspect: 0.99, titleLineCount: 3, bodyLineCount: 6 })
+
+  assert.equal(layout.photo.left, 0)
+  assert.equal(layout.text.anchor, 'start')
+  assert.ok(layout.text.x + 12 * 42 <= 1440)
+  assert.ok(layout.text.tagsY < layout.qr.top)
 })

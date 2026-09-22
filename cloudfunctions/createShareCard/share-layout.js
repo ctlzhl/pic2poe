@@ -12,6 +12,45 @@ const editorialTypography = () => ({
   tags: { fontSize: 30, lineHeight: 40 }
 })
 
+const visualImageAspect = ({ width = 1, height = 1, orientation = 1 } = {}) => {
+  const rawWidth = Math.max(1, Number(width) || 1)
+  const rawHeight = Math.max(1, Number(height) || 1)
+  const isRotated = [5, 6, 7, 8].includes(Number(orientation))
+  return isRotated ? rawHeight / rawWidth : rawWidth / rawHeight
+}
+
+// 图评、文案以展示方向判定版式：方图归入上图下文，避免右侧文字区过窄。
+const editorialLayoutFor = (metadata = {}) => ({
+  kind: visualImageAspect(metadata) < 1 ? 'side-by-side' : 'stacked',
+  imageAspect: visualImageAspect(metadata)
+})
+
+const editorialSideBySideLayout = ({ imageAspect = 0.75, titleLineCount = 1, bodyLineCount = 1 } = {}) => {
+  const safeImageAspect = Math.min(0.99, Math.max(0.3, Number(imageAspect) || 0.75))
+  const safeTitleLines = Math.min(3, Math.max(1, Number(titleLineCount) || 1))
+  const safeBodyLines = Math.min(6, Math.max(1, Number(bodyLineCount) || 1))
+  const availablePhotoHeight = CANVAS_HEIGHT - CARD_GAP * 2
+  const photoWidth = Math.min(820, Math.round(availablePhotoHeight * safeImageAspect))
+  const photoHeight = Math.min(availablePhotoHeight, Math.round(photoWidth / safeImageAspect))
+  const photoTop = CARD_GAP + Math.round((availablePhotoHeight - photoHeight) / 2)
+  const textLeft = photoWidth + 72
+  const typography = editorialTypography()
+  const titleHeight = typography.title.fontSize + (safeTitleLines - 1) * typography.title.lineHeight
+  const bodyHeight = typography.body.fontSize + (safeBodyLines - 1) * typography.body.lineHeight
+  const groupHeight = typography.label.fontSize + 64 + titleHeight + 66 + bodyHeight + 64 + typography.tags.fontSize
+  const groupTop = 180 + Math.round((1320 - groupHeight) / 2)
+  const labelY = groupTop + typography.label.fontSize
+  const titleY = labelY + 64 + typography.title.fontSize
+  const bodyY = titleY + (safeTitleLines - 1) * typography.title.lineHeight + 66 + typography.body.fontSize
+  const tagsY = bodyY + (safeBodyLines - 1) * typography.body.lineHeight + 64 + typography.tags.fontSize
+
+  return {
+    photo: { left: 0, top: photoTop, width: photoWidth, height: photoHeight, fit: 'contain', position: 'centre' },
+    text: { x: textLeft, anchor: 'start', labelY, titleY, bodyY, tagsY },
+    qr: { left: 1206, top: 1600, size: QR_SIZE }
+  }
+}
+
 const landscapePoemLayout = () => ({
   photo: {
     left: 0,
@@ -72,4 +111,4 @@ const portraitPoemLayout = ({ titleLineCount = 1, poemLineCount = 4, imageAspect
   }
 }
 
-module.exports = { landscapePoemLayout, portraitPoemLayout, editorialTypography }
+module.exports = { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout }

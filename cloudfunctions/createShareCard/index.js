@@ -1,6 +1,6 @@
 const crypto = require('node:crypto')
 const cloud = require('wx-server-sdk')
-const { landscapePoemLayout, portraitPoemLayout, editorialTypography } = require('./share-layout')
+const { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout } = require('./share-layout')
 const { canCreateShareForWork } = require('./share-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
@@ -8,7 +8,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const CANVAS_WIDTH = 1440
 const CANVAS_HEIGHT = 1800
-const TEMPLATE_VERSION = 'share-v7'
+const TEMPLATE_VERSION = 'share-v8'
 const CARD_TOP_GAP = 48
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
@@ -87,7 +87,10 @@ const templateFor = (type, imageMetadata) => {
   if (type === 'poem') {
     return imageMetadata.width > imageMetadata.height * 1.1 ? 'poem-landscape-v1' : 'poem-portrait-v1'
   }
-  return type === 'review' ? 'review-editorial-v1' : 'copy-moment-v1'
+  const editorialLayout = editorialLayoutFor(imageMetadata)
+  return type === 'review'
+    ? `review-editorial-${editorialLayout.kind}-v1`
+    : `copy-moment-${editorialLayout.kind}-v1`
 }
 
 const getShareTitle = (work) => {
@@ -215,20 +218,41 @@ const renderPoemCard = async (work, source, metadata, qr) => {
   return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
 }
 
-const renderEditorialCard = async (work, source, qr) => {
+const renderEditorialCard = async (work, source, qr, metadata) => {
   const isReview = work.type === 'review'
-  // 把空间让给正文，移动端分享时无需依赖缩放才看清文字。
-  const photoHeight = isReview ? 990 : 860
-  const photo = await renderPhoto(source, CANVAS_WIDTH, photoHeight - CARD_TOP_GAP)
   const headline = isReview ? work.content?.review?.headline : work.content?.copy?.headline
   const body = isReview ? work.content?.review?.body : work.content?.copy?.body
   const label = isReview ? '图片点评' : (work.content?.copy?.label || '配图文案')
   const tags = isReview ? work.content?.review?.observations : work.content?.copy?.hashtags
+  const tagLine = Array.isArray(tags) ? truncate(tags.filter(Boolean).slice(0, 2).join('  '), 30) : ''
+  const typography = editorialTypography()
+  const editorialLayout = editorialLayoutFor(metadata)
+
+  if (editorialLayout.kind === 'side-by-side') {
+    const titleLines = wrapText(headline, 8, 3)
+    const bodyLines = wrapText(body, 12, isReview ? 5 : 6)
+    const sideTagLine = truncate(tagLine, 14)
+    const layout = editorialSideBySideLayout({
+      imageAspect: editorialLayout.imageAspect,
+      titleLineCount: titleLines.length || 1,
+      bodyLineCount: bodyLines.length || 1
+    })
+    const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
+    const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+      ${svgText([truncate(label, 18)], { x: layout.text.x, y: layout.text.labelY, ...typography.label, fill: '#74826f', weight: 700, anchor: layout.text.anchor })}
+      ${svgText(titleLines, { x: layout.text.x, y: layout.text.titleY, ...typography.title, fill: '#2f3c2e', weight: 700, anchor: layout.text.anchor })}
+      ${svgText(bodyLines, { x: layout.text.x, y: layout.text.bodyY, ...typography.body, fill: '#526052', anchor: layout.text.anchor })}
+      ${svgText(sideTagLine ? [sideTagLine] : [], { x: layout.text.x, y: layout.text.tagsY, ...typography.tags, fill: '#74826f', anchor: layout.text.anchor })}
+    </svg>`
+    return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
+  }
+
+  // 横图和方图使用上图下文，给照片与正文提供完整宽度。
+  const photoHeight = isReview ? 990 : 860
+  const photo = await renderPhoto(source, CANVAS_WIDTH, photoHeight - CARD_TOP_GAP)
   const titleLines = wrapText(headline, 14, 2)
   const bodyLines = wrapText(body, 21, isReview ? 3 : 4)
-  const tagLine = Array.isArray(tags) ? truncate(tags.filter(Boolean).slice(0, 2).join('  '), 30) : ''
   const textTop = photoHeight + 76
-  const typography = editorialTypography()
   const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="${photoHeight}" width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT - photoHeight}" fill="#f7f1e7"/>
     ${svgText([truncate(label, 18)], { x: 84, y: textTop, ...typography.label, fill: '#74826f', weight: 700 })}
@@ -325,7 +349,7 @@ exports.main = async (event = {}) => {
     const template = templateFor(shareWork.type, metadata)
     const card = shareWork.type === 'poem'
       ? await renderPoemCard(shareWork, source, metadata, qr)
-      : await renderEditorialCard(shareWork, source, qr)
+      : await renderEditorialCard(shareWork, source, qr, metadata)
     const cardPath = `users/${openid}/share/${workId}/${TEMPLATE_VERSION}-${hash.slice(0, 16)}.jpg`
     const upload = await cloud.uploadFile({ cloudPath: cardPath, fileContent: card })
     uploadedFileId = upload.fileID

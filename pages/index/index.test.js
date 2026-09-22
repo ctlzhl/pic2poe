@@ -104,6 +104,44 @@ test('选择图片时只允许一张并默认使用压缩图', async () => {
   }
 })
 
+test('系统相册临时隐藏页面后仍继续准备所选图片', async () => {
+  const definition = loadPageDefinition()
+  const previousWx = global.wx
+  let finishSelection
+  const functionCalls = []
+  global.wx = {
+    chooseMedia: () => new Promise((resolve) => { finishSelection = resolve }),
+    cloud: {
+      callFunction({ name, success }) {
+        functionCalls.push(name)
+        if (name === 'createImageUpload') {
+          success({ result: { ok: true, data: { assetId: 'asset-1', stagingPath: 'staging/u/photo.jpg' } } })
+          return
+        }
+        success({ result: { ok: true, data: {} } })
+      },
+      uploadFile({ success }) { success({ fileID: 'cloud://staging.jpg' }) }
+    },
+    showLoading() {}, hideLoading() {}, showToast() {}, showModal() {}
+  }
+
+  try {
+    const page = createPage(definition, {})
+    const choosing = page.chooseImage()
+    while (!finishSelection) await Promise.resolve()
+    page.onHide()
+    finishSelection({ tempFiles: [{ tempFilePath: '/tmp/photo.jpg', size: 100 }] })
+    await choosing
+
+    assert.deepEqual(functionCalls, ['createImageUpload', 'prepareImage'])
+    assert.equal(page.data.assetId, 'asset-1')
+    assert.equal(page.data.prepareState, 'ready')
+  } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})
+
 test('离开创作页后清空未提交的图片与创作草稿', () => {
   const definition = loadPageDefinition()
   const previousWx = global.wx

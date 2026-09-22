@@ -85,6 +85,8 @@ Page({
   },
 
   onHide() {
+    // 系统相册属于原生全屏页面，也会触发 onHide；此时仍要接收用户刚选中的图片。
+    if (this.isChoosingMedia) return
     this.resetDraft()
     wx.hideLoading()
   },
@@ -109,12 +111,18 @@ Page({
     }
     try {
       await requirePrivacyAuthorization()
-      const selection = await wx.chooseMedia({
-        count: 1,
-        mediaType: ['image'],
-        sourceType: ['album', 'camera'],
-        sizeType: ['compressed', 'original']
-      })
+      this.isChoosingMedia = true
+      let selection
+      try {
+        selection = await wx.chooseMedia({
+          count: 1,
+          mediaType: ['image'],
+          sourceType: ['album', 'camera'],
+          sizeType: ['compressed', 'original']
+        })
+      } finally {
+        this.isChoosingMedia = false
+      }
       const file = selection.tempFiles?.[0]
       const tempFilePath = file?.tempFilePath || ''
       if (!tempFilePath) throw new Error('未获取到图片路径')
