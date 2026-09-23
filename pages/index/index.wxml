@@ -26,13 +26,13 @@
   <view wx:if="{{!imageUrl}}" class="guide-card">
     <view class="guide-title">三步开始创作</view>
     <view class="guide-item"><text>1</text>补充照片背后的故事</view>
-    <view class="guide-item"><text>2</text>选择想生成的内容类型</view>
-    <view class="guide-item"><text>3</text>生成并保存你的作品</view>
+    <view class="guide-item"><text>2</text>选择想创作的内容类型</view>
+    <view class="guide-item"><text>3</text>查看并保存你的作品</view>
   </view>
 
   <view wx:if="{{assetId}}" class="creation-form">
     <view class="section">
-      <view class="section-label">需要生成的类型</view>
+      <view class="section-label">选择想要的类型</view>
       <view class="type-list">
         <view wx:for="{{generateTypes}}" wx:key="value" class="type-item {{generateType === item.value ? 'selected' : ''}}" data-value="{{item.value}}" bindtap="selectGenerateType">
           <view class="type-title">{{item.title}}</view>
@@ -61,6 +61,6 @@
   </view>
 
   <view wx:if="{{assetId}}" class="creation-action-bar">
-    <button class="primary-button" loading="{{submitting}}" disabled="{{preparing || submitting || !assetId}}" bindtap="startCreation">开始生成</button>
+    <button class="primary-button" loading="{{submitting}}" disabled="{{preparing || submitting || !assetId}}" bindtap="startCreation">开始创作</button>
   </view>
 </view>

@@ -2,6 +2,9 @@
   "usingComponents": {
     "bottom-nav": "/components/bottom-nav/index"
   },
+  "componentPlaceholder": {
+    "bottom-nav": "view"
+  },
   "navigationBarTitleText": "创作结果",
   "enableShareTimeline": true
 }

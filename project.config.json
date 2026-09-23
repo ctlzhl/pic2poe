@@ -13,6 +13,8 @@
       "outputPath": ""
     },
     "useComponentLazyLoad": true,
+    "ignoreDevUnusedFiles": false,
+    "ignoreUploadUnusedFiles": false,
     "useCompilerPlugins": false,
     "minifyWXML": true,
     "compileWorklet": false,
@@ -28,7 +30,13 @@
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "value": ".agents", "type": "folder" },
+      { "value": "docs", "type": "folder" },
+      { "value": "assets/images/zhihu-photo-words-wechat-cover-900x383.png", "type": "file" },
+      { "value": "assets/images/zhihu-photo-words-wechat-cover-v1.png", "type": "file" },
+      { "value": "skills-lock.json", "type": "file" }
+    ],
     "include": []
   },
   "appid": "wx098a147c55900e26",

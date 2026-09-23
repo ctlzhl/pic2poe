@@ -10,7 +10,7 @@ const HEIC_EXTENSIONS = new Set(['heic', 'heif'])
 const generateTypes = [
   { value: 'poem', title: '五言绝句', description: '把此刻写成一首诗' },
   { value: 'review', title: '图评', description: '读出照片里的故事' },
-  { value: 'copy', title: '文案', description: '生成可直接分享的文字' }
+  { value: 'copy', title: '文案', description: '获得可直接分享的文字' }
 ]
 
 const moods = [

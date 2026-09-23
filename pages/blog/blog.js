@@ -13,6 +13,10 @@ Page({
   },
 
   onLoad() {
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
     this.requestVersion = 1
     this.loadCategories()
     this.loadMore({ requestVersion: this.requestVersion })
@@ -65,5 +69,16 @@ Page({
     this.setData({ posts: [], page: 0, hasMore: true, loading: false })
     this.loadMore({ force: true, requestVersion })
   },
-  openPost(event) { const postId = event.currentTarget.dataset.postId; if (postId) wx.navigateTo({ url: `/pages/blog-detail/blog-detail?postId=${postId}` }) }
+  openPost(event) { const postId = event.currentTarget.dataset.postId; if (postId) wx.navigateTo({ url: `/pages/blog-detail/blog-detail?postId=${postId}` }) },
+
+  onShareAppMessage() {
+    return {
+      title: '随便看看｜照片有话说',
+      path: '/pages/blog/blog'
+    }
+  },
+
+  onShareTimeline() {
+    return { title: '随便看看｜照片有话说' }
+  }
 })

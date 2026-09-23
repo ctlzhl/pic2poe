@@ -1,5 +1,8 @@
 {
   "usingComponents": {
     "bottom-nav": "/components/bottom-nav/index"
+  },
+  "componentPlaceholder": {
+    "bottom-nav": "view"
   }
 }
