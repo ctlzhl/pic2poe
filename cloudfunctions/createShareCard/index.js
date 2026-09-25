@@ -1,7 +1,8 @@
 const crypto = require('node:crypto')
 const cloud = require('wx-server-sdk')
 const { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout } = require('./share-layout')
-const { canCreateShareForWork } = require('./share-core')
+const { canCreateShareForWork, canReuseShareCard } = require('./share-core')
+const { checkImage, checkText } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -307,6 +308,25 @@ const existingCard = async (workId, userId, hash) => {
   return result.data[0] || null
 }
 
+const ensureCheckedBeforeSharing = async (work, asset, openid) => {
+  if (asset.safety?.status !== 'passed') {
+    const source = await cloud.downloadFile({ fileID: asset.thumbnailFileId || asset.creationFileId })
+    const jpeg = asset.thumbnailFileId
+      ? source.fileContent
+      : await sharp(source.fileContent).resize(640, 640, { fit: 'inside' }).jpeg({ quality: 75 }).toBuffer()
+    await checkImage(cloud, jpeg)
+    await db.collection('imageAssets').doc(asset._id).update({
+      data: { safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() }, updatedAt: db.serverDate() }
+    })
+  }
+  if (work.safety?.status !== 'passed') {
+    await checkText(cloud, JSON.stringify(work.content), openid)
+    await db.collection('works').doc(work._id).update({
+      data: { safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() } }
+    })
+  }
+}
+
 exports.main = async (event = {}) => {
   const openid = cloud.getWXContext().OPENID
   const workId = typeof event.workId === 'string' ? event.workId : ''
@@ -327,18 +347,23 @@ exports.main = async (event = {}) => {
       // 旧作品可能没有草稿；继续生成分享图，但不会引入新的用户输入。
       console.warn('读取分享脱敏上下文失败:', error?.message || error)
     }
+    const asset = (await db.collection('imageAssets').doc(work.imageAssetId).get()).data
+    if (!asset?.creationFileId || asset.userId !== openid) return fail('ASSET_NOT_FOUND', '作品图片已失效，暂不能分享。')
+    await ensureCheckedBeforeSharing(work, asset, openid)
     const shareWork = { ...work, content: redactShareContent(work.content, draft?.location) }
     const hash = contentHash(shareWork)
     const reusable = await existingCard(workId, openid, hash)
     if (reusable?.fileId) {
+      if (!canReuseShareCard(reusable)) {
+        await db.collection('shareCards').doc(reusable._id).update({
+          data: { safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() }, updatedAt: db.serverDate() }
+        })
+      }
       const shareImageUrl = await getTempUrl(reusable.fileId)
       if (shareImageUrl) {
         return { ok: true, data: { shareToken: reusable.shareToken, shareImageUrl, shareTitle: reusable.shareTitle } }
       }
     }
-
-    const asset = (await db.collection('imageAssets').doc(work.imageAssetId).get()).data
-    if (!asset?.creationFileId || asset.userId !== openid) return fail('ASSET_NOT_FOUND', '作品图片已失效，暂不能分享。')
 
     const source = (await cloud.downloadFile({ fileID: asset.creationFileId })).fileContent
     const metadata = await sharp(source).metadata()
@@ -382,6 +407,7 @@ exports.main = async (event = {}) => {
           contentHash: hash,
           fileId: upload.fileID,
           shareTitle,
+          safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() },
           status: 'ready',
           createdAt: db.serverDate(),
           updatedAt: db.serverDate()
@@ -408,6 +434,8 @@ exports.main = async (event = {}) => {
       return fail('SHARP_UNAVAILABLE', '分享图处理服务未正确部署，请联系管理员更新服务。')
     }
     if (error?.message === 'WORK_NOT_FOUND') return fail('WORK_NOT_FOUND', '作品已删除，无法生成分享图。')
+    if (error?.message === 'CONTENT_REJECTED') return fail('CONTENT_REJECTED', '内容含违规信息，请更换后重试。')
+    if (error?.message === 'CONTENT_CHECK_UNAVAILABLE') return fail('CONTENT_CHECK_UNAVAILABLE', '内容校验暂不可用，请稍后重试。')
     if (error?.message === 'WXACODE_FAILED') {
       return fail('WXACODE_FAILED', '小程序码生成失败，请稍后重试。')
     }

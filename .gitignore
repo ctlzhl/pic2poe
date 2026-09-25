@@ -12,6 +12,9 @@ cloudfunctions/**/.DS_Store
 !.env.example
 cloudfunctions/**/config.json
 !cloudfunctions/createShareCard/config.json
+!cloudfunctions/prepareImage/config.json
+!cloudfunctions/createCreation/config.json
+!cloudfunctions/runCreation/config.json
 project.private.config.json
 
 # 系统文件

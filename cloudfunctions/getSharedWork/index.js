@@ -1,4 +1,5 @@
 const cloud = require('wx-server-sdk')
+const { canReadPublicShare } = require('./share-access-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -21,7 +22,7 @@ exports.main = async (event = {}) => {
       .limit(1)
       .get()
     const share = result.data[0]
-    if (!share?.creationFileId || !share?.content || !share?.type) {
+    if (!canReadPublicShare(share)) {
       return fail('SHARE_NOT_FOUND', '分享内容不存在或已失效。')
     }
 

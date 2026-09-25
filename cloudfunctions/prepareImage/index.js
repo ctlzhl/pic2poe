@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk')
 const sharp = require('sharp')
 const { uploadWithCompensation } = require('./storage-core')
+const { checkImage } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -168,6 +169,17 @@ exports.main = async (event = {}) => {
     return fail('INVALID_IMAGE', '图片无法读取，请重新选择。')
   }
 
+  try {
+    await checkImage(cloud, derived.thumbnailBuffer)
+  } catch (error) {
+    const rejected = error?.message === 'CONTENT_REJECTED'
+    await markAssetFailed(assetId, rejected ? 'CONTENT_REJECTED' : 'CONTENT_CHECK_UNAVAILABLE')
+    await bestEffortDelete(fileID)
+    return rejected
+      ? fail('CONTENT_REJECTED', '图片内容含违规信息，请更换后重试。')
+      : fail('CONTENT_CHECK_UNAVAILABLE', '图片内容校验暂不可用，请稍后重试。')
+  }
+
   const originalPath = `original/${openid}/${assetId}.${sourceExtension(metadata.format)}`
   const creationPath = `users/${openid}/creation/${assetId}.jpg`
   const thumbnailPath = `users/${openid}/thumbnail/${assetId}.jpg`
@@ -193,6 +205,7 @@ exports.main = async (event = {}) => {
             creationBytes: Buffer.byteLength(derived.creationBuffer),
             thumbnailBytes: Buffer.byteLength(derived.thumbnailBuffer),
             metadata: toPublicMetadata(metadata),
+            safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() },
             stagingFileId: '',
             errorCode: '',
             readyAt: db.serverDate(),

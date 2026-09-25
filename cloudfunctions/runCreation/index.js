@@ -1,5 +1,6 @@
 const cloud = require('wx-server-sdk')
 const { getModelConfig, poemGenerationModel } = require('./model-core')
+const { checkImage, checkText } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -102,7 +103,8 @@ const taskError = (error) => {
   const message = error?.message || ''
   if (message === 'TASK_TIMEOUT') return { code: 'TASK_TIMEOUT', message: '这次没有写完，再试一次吧。' }
   if (message === 'INVALID_OUTPUT') return { code: 'INVALID_OUTPUT', message: '这次创作没有完成，请再试一次。' }
-  if (message === 'SAFETY_REJECTED') return { code: 'SAFETY_REJECTED', message: '这张照片暂时无法生成内容，请更换一张照片。' }
+  if (message === 'SAFETY_REJECTED' || message === 'CONTENT_REJECTED') return { code: 'CONTENT_REJECTED', message: '内容含违规信息，请更换后重试。' }
+  if (message === 'CONTENT_CHECK_UNAVAILABLE') return { code: 'CONTENT_CHECK_UNAVAILABLE', message: '内容校验暂不可用，请稍后重试。' }
   if (message === 'QWEN_CONFIG_MISSING') return { code: 'MODEL_CONFIG_MISSING', message: '图片理解模型尚未配置，请联系管理员完成配置。' }
   if (message.includes('尚未配置')) return { code: 'MODEL_UNAVAILABLE', message: '创作服务暂未准备好，请稍后再试。' }
   if (error?.name === 'AbortError') return { code: 'MODEL_TIMEOUT', message: '这次没有写完，再试一次吧。' }
@@ -146,7 +148,7 @@ const markFailed = async (task, error) => {
     await transaction.collection('creationTasks').doc(task._id).update({ data: update })
     await updateAttempt(transaction, task.attemptId, 'failed', {
       ...update,
-      safety: error?.message === 'SAFETY_REJECTED' ? { status: 'rejected' } : undefined,
+      safety: ['SAFETY_REJECTED', 'CONTENT_REJECTED'].includes(error?.message) ? { status: 'rejected' } : undefined,
       finishedAt: db.serverDate()
     })
   })
@@ -289,8 +291,22 @@ exports.main = async (event = {}) => {
     if (!draft || draft.userId !== openid || !asset || asset.userId !== openid || asset.status !== 'ready') {
       throw new Error('INVALID_OUTPUT')
     }
+    if (asset.safety?.status !== 'passed') {
+      if (!asset.thumbnailFileId) throw new Error('CONTENT_CHECK_UNAVAILABLE')
+      const thumbnail = await cloud.downloadFile({ fileID: asset.thumbnailFileId })
+      await checkImage(cloud, thumbnail.fileContent)
+      await db.collection('imageAssets').doc(asset._id).update({
+        data: { safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() }, updatedAt: db.serverDate() }
+      })
+    }
+    if (draft.safety?.status !== 'passed') {
+      await checkText(cloud, [draft.location, draft.moment].filter(Boolean).join('\n'), openid)
+      await db.collection('creationDrafts').doc(draft._id).update({
+        data: { safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() }, updatedAt: db.serverDate() }
+      })
+    }
     assertNotTimedOut(task)
-  const config = getModelConfig()
+    const config = getModelConfig()
     const reusableAnalysis = await findReusableUnderstanding(task.draftId, openid)
     const analysis = reusableAnalysis
       ? { understanding: reusableAnalysis.photoUnderstanding, reused: true, modelMeta: reusableAnalysis.modelMeta?.analysis || null }
@@ -313,6 +329,7 @@ exports.main = async (event = {}) => {
 
     const generated = await generateContent(task, draft, analysis.understanding, config)
     const safety = assertSafeContent(generated.content)
+    await checkText(cloud, contentAsText(generated.content), openid)
     assertNotTimedOut(task)
     const workId = newId('work')
 
@@ -333,6 +350,7 @@ exports.main = async (event = {}) => {
           imageAssetId: asset._id,
           type: draft.generateType,
           content: generated.content,
+          safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() },
           createdAt: db.serverDate()
         }
       })

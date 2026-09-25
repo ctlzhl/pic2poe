@@ -1,5 +1,6 @@
 const cloud = require('wx-server-sdk')
 const { findUserRecord } = require('./creation-core')
+const { checkText } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -88,6 +89,14 @@ exports.main = async (event = {}) => {
   if (!GENERATE_TYPES.has(generateType)) return fail('INVALID_TYPE', '请选择想生成的内容类型。')
   if (!idempotencyKey) return fail('INVALID_REQUEST', '创作请求无效，请重新开始。')
 
+  try {
+    await checkText(cloud, [location, moment].filter(Boolean).join('\n'), openid)
+  } catch (error) {
+    return error?.message === 'CONTENT_REJECTED'
+      ? fail('CONTENT_REJECTED', '文字内容含违规信息，请修改后重试。')
+      : fail('CONTENT_CHECK_UNAVAILABLE', '文字内容校验暂不可用，请稍后重试。')
+  }
+
   const draftId = newId('draft')
   const taskId = newId('task')
   const attemptId = newId('attempt')
@@ -149,6 +158,7 @@ exports.main = async (event = {}) => {
           location,
           moment,
           mood,
+          safety: { status: 'passed', provider: 'wechat', checkedAt: now },
           createdAt: now,
           updatedAt: now
         }
