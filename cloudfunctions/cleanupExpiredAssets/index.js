@@ -83,6 +83,7 @@ exports.main = async () => {
 
       await deleteFiles([
         asset.stagingFileId,
+        asset.workingStagingFileId,
         asset.originalFileId,
         asset.creationFileId,
         asset.thumbnailFileId

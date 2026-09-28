@@ -1,16 +1,14 @@
 const crypto = require('node:crypto')
 const cloud = require('wx-server-sdk')
-const { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout } = require('./share-layout')
+const { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout, editorialStackedLayout, visualImageAspect } = require('./share-layout')
 const { canCreateShareForWork, canReuseShareCard } = require('./share-core')
 const { checkImage, checkText } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const CANVAS_WIDTH = 1440
-const CANVAS_HEIGHT = 1800
-const TEMPLATE_VERSION = 'share-v8'
-const CARD_TOP_GAP = 48
+const TEMPLATE_VERSION = 'share-v9'
+const CARD_BACKGROUND = '#f7f1e7'
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
 let wechatAccessTokenCache = null
@@ -86,12 +84,12 @@ const createShareToken = () => crypto.randomBytes(20).toString('base64url')
 
 const templateFor = (type, imageMetadata) => {
   if (type === 'poem') {
-    return imageMetadata.width > imageMetadata.height * 1.1 ? 'poem-landscape-v1' : 'poem-portrait-v1'
+    return visualImageAspect(imageMetadata) >= 1 ? 'poem-stacked-v2' : 'poem-side-by-side-v2'
   }
   const editorialLayout = editorialLayoutFor(imageMetadata)
   return type === 'review'
-    ? `review-editorial-${editorialLayout.kind}-v1`
-    : `copy-moment-${editorialLayout.kind}-v1`
+    ? `review-editorial-${editorialLayout.kind}-v2`
+    : `copy-moment-${editorialLayout.kind}-v2`
 }
 
 const getShareTitle = (work) => {
@@ -105,9 +103,9 @@ const renderPhoto = (imageBuffer, width, height, options = {}) => sharp(imageBuf
   .resize({
     width,
     height,
-    fit: options.fit || 'contain',
+    fit: options.fit || 'cover',
     position: options.position || 'centre',
-    background: '#e7e1d5',
+    background: CARD_BACKGROUND,
     withoutEnlargement: false
   })
   .jpeg({ quality: 90, mozjpeg: true })
@@ -178,8 +176,8 @@ const getWxaCodeViaHttps = async (shareToken) => {
   return Buffer.from(await response.arrayBuffer())
 }
 
-const compose = async (photo, photoPosition, textSvg, qr, qrPosition) => sharp({
-  create: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT, channels: 3, background: '#f7f1e7' }
+const compose = async (canvas, photo, photoPosition, textSvg, qr, qrPosition) => sharp({
+  create: { width: canvas.width, height: canvas.height, channels: 3, background: CARD_BACKGROUND }
 })
   .composite([
     { input: photo, left: photoPosition.left, top: photoPosition.top },
@@ -193,37 +191,32 @@ const renderPoemCard = async (work, source, metadata, qr) => {
   const title = truncate(work.content?.poem?.title || '这一刻', 14)
   const lines = Array.isArray(work.content?.poem?.lines) ? work.content.poem.lines.slice(0, 4) : []
   const family = 'Noto Serif CJK SC, Songti SC, STKaiti, serif'
-  const landscape = metadata.width > metadata.height * 1.1
+  const imageAspect = visualImageAspect(metadata)
 
-  if (landscape) {
-    const layout = landscapePoemLayout()
+  if (imageAspect >= 1) {
+    const layout = landscapePoemLayout({ imageAspect })
     const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
-    const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${CANVAS_WIDTH}" height="${layout.photo.top}" fill="#f7f1e7"/>
+    const textSvg = `<svg width="${layout.canvas.width}" height="${layout.canvas.height}" xmlns="http://www.w3.org/2000/svg">
       ${svgText([title], { x: layout.text.x, y: layout.text.titleY, fontSize: 64, lineHeight: 76, fill: '#263426', weight: 700, family, anchor: layout.text.anchor })}
       ${svgText(lines, { x: layout.text.x, y: layout.text.bodyY, fontSize: 52, lineHeight: 86, fill: '#3c493b', family, anchor: layout.text.anchor })}
     </svg>`
-    return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
+    return compose(layout.canvas, photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
   }
 
   const titleLines = wrapText(title, 8, 2)
-  const rotated = [5, 6, 7, 8].includes(Number(metadata.orientation))
-  const imageAspect = rotated ? metadata.height / metadata.width : metadata.width / metadata.height
   const layout = portraitPoemLayout({ titleLineCount: titleLines.length, poemLineCount: lines.length || 1, imageAspect })
   const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
-  const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-    <rect x="${layout.photo.width}" y="0" width="${CANVAS_WIDTH - layout.photo.width}" height="${CANVAS_HEIGHT}" fill="#f7f1e7"/>
+  const textSvg = `<svg width="${layout.canvas.width}" height="${layout.canvas.height}" xmlns="http://www.w3.org/2000/svg">
     ${svgText(titleLines, { x: layout.text.x, y: layout.text.titleY, fontSize: 58, lineHeight: 78, fill: '#263426', weight: 700, family, anchor: layout.text.anchor })}
     ${svgText(lines, { x: layout.text.x, y: layout.text.bodyY, fontSize: 48, lineHeight: 90, fill: '#3c493b', family, anchor: layout.text.anchor })}
   </svg>`
-  return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
+  return compose(layout.canvas, photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
 }
 
 const renderEditorialCard = async (work, source, qr, metadata) => {
   const isReview = work.type === 'review'
   const headline = isReview ? work.content?.review?.headline : work.content?.copy?.headline
   const body = isReview ? work.content?.review?.body : work.content?.copy?.body
-  const label = isReview ? '图片点评' : (work.content?.copy?.label || '配图文案')
   const tags = isReview ? work.content?.review?.observations : work.content?.copy?.hashtags
   const tagLine = Array.isArray(tags) ? truncate(tags.filter(Boolean).slice(0, 2).join('  '), 30) : ''
   const typography = editorialTypography()
@@ -239,29 +232,28 @@ const renderEditorialCard = async (work, source, qr, metadata) => {
       bodyLineCount: bodyLines.length || 1
     })
     const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
-    const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      ${svgText([truncate(label, 18)], { x: layout.text.x, y: layout.text.labelY, ...typography.label, fill: '#74826f', weight: 700, anchor: layout.text.anchor })}
+    const textSvg = `<svg width="${layout.canvas.width}" height="${layout.canvas.height}" xmlns="http://www.w3.org/2000/svg">
       ${svgText(titleLines, { x: layout.text.x, y: layout.text.titleY, ...typography.title, fill: '#2f3c2e', weight: 700, anchor: layout.text.anchor })}
       ${svgText(bodyLines, { x: layout.text.x, y: layout.text.bodyY, ...typography.body, fill: '#526052', anchor: layout.text.anchor })}
       ${svgText(sideTagLine ? [sideTagLine] : [], { x: layout.text.x, y: layout.text.tagsY, ...typography.tags, fill: '#74826f', anchor: layout.text.anchor })}
     </svg>`
-    return compose(photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
+    return compose(layout.canvas, photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
   }
 
-  // 横图和方图使用上图下文，给照片与正文提供完整宽度。
-  const photoHeight = isReview ? 990 : 860
-  const photo = await renderPhoto(source, CANVAS_WIDTH, photoHeight - CARD_TOP_GAP)
   const titleLines = wrapText(headline, 14, 2)
   const bodyLines = wrapText(body, 21, isReview ? 3 : 4)
-  const textTop = photoHeight + 76
-  const textSvg = `<svg width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0" y="${photoHeight}" width="${CANVAS_WIDTH}" height="${CANVAS_HEIGHT - photoHeight}" fill="#f7f1e7"/>
-    ${svgText([truncate(label, 18)], { x: 84, y: textTop, ...typography.label, fill: '#74826f', weight: 700 })}
-    ${svgText(titleLines, { x: 84, y: textTop + 100, ...typography.title, fill: '#2f3c2e', weight: 700 })}
-    ${svgText(bodyLines, { x: 84, y: textTop + 100 + titleLines.length * typography.title.lineHeight + 64, ...typography.body, fill: '#526052' })}
-    ${svgText(tagLine ? [tagLine] : [], { x: 84, y: 1710, ...typography.tags, fill: '#74826f' })}
+  const layout = editorialStackedLayout({
+    imageAspect: editorialLayout.imageAspect,
+    titleLineCount: titleLines.length || 1,
+    bodyLineCount: bodyLines.length || 1
+  })
+  const photo = await renderPhoto(source, layout.photo.width, layout.photo.height, layout.photo)
+  const textSvg = `<svg width="${layout.canvas.width}" height="${layout.canvas.height}" xmlns="http://www.w3.org/2000/svg">
+    ${svgText(titleLines, { x: layout.text.x, y: layout.text.titleY, ...typography.title, fill: '#2f3c2e', weight: 700 })}
+    ${svgText(bodyLines, { x: layout.text.x, y: layout.text.bodyY, ...typography.body, fill: '#526052' })}
+    ${svgText(tagLine ? [tagLine] : [], { x: layout.text.x, y: layout.text.tagsY, ...typography.tags, fill: '#74826f' })}
   </svg>`
-  return compose(photo, { left: 0, top: CARD_TOP_GAP }, textSvg, qr, { left: 1206, top: 1600 })
+  return compose(layout.canvas, photo, { left: layout.photo.left, top: layout.photo.top }, textSvg, qr, layout.qr)
 }
 
 const getWxaCode = async (shareToken) => {

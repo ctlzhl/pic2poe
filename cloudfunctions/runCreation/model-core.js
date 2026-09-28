@@ -1,7 +1,7 @@
 const QWEN_GENERATION_MODEL = 'qwen3.7-flash-2026-07-15'
 
 const DEFAULT_MODEL_CONFIG = {
-  promptVersion: 'p1-20260903',
+  promptVersion: 'p1-20260927',
   requestTimeoutMs: 18000,
   maxRetries: 1,
   visionTemperature: 0.2,

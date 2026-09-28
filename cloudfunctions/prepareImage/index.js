@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk')
 const sharp = require('sharp')
 const { uploadWithCompensation } = require('./storage-core')
+const { downloadAndDerive, matchesUploadTicket } = require('./input-core')
 const { checkImage } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
@@ -34,6 +35,28 @@ const detectMagicType = (buffer) => {
 }
 
 const sourceExtension = (format) => (format === 'jpeg' ? 'jpg' : format)
+const inputError = (code) => Object.assign(new Error(code), { code })
+
+const inspectInput = async (input) => {
+  if (!Buffer.isBuffer(input) || input.length === 0) throw inputError('EMPTY_FILE')
+  if (input.length > MAX_BYTES) throw inputError('FILE_TOO_LARGE')
+  if (!ALLOWED_FORMATS.has(detectMagicType(input))) throw inputError('UNSUPPORTED_IMAGE')
+  let metadata
+  try {
+    metadata = await sharp(input, { limitInputPixels: MAX_PIXELS }).metadata()
+  } catch (error) {
+    throw inputError('INVALID_IMAGE')
+  }
+  if (!ALLOWED_FORMATS.has(metadata.format)) throw inputError('UNSUPPORTED_IMAGE')
+  if (!metadata.width || !metadata.height) throw inputError('INVALID_IMAGE')
+  if (metadata.width * metadata.height > MAX_PIXELS) throw inputError('INVALID_IMAGE')
+  return metadata
+}
+
+const imageAspect = (metadata) => {
+  const sideways = [5, 6, 7, 8].includes(metadata.orientation || 1)
+  return sideways ? metadata.height / metadata.width : metadata.width / metadata.height
+}
 
 const markAssetFailed = async (assetId, code) => {
   try {
@@ -58,8 +81,6 @@ const bestEffortDeleteFiles = async (fileIDs) => {
     console.warn('图片文件清理失败:', error && error.message ? error.message : String(error))
   }
 }
-
-const bestEffortDelete = async (fileID) => bestEffortDeleteFiles([fileID])
 
 const buildDerivedImages = async (input) => {
   const base = sharp(input, { limitInputPixels: MAX_PIXELS, pages: 1 })
@@ -92,8 +113,30 @@ const buildDerivedImages = async (input) => {
   return { creationBuffer, thumbnailBuffer }
 }
 
+const buildSafetyThumbnail = (input) => sharp(input, { limitInputPixels: MAX_PIXELS, pages: 1 })
+  .rotate()
+  .toColorspace('srgb')
+  .flatten({ background: '#ffffff' })
+  .resize({
+    width: THUMBNAIL_MAX_EDGE,
+    height: THUMBNAIL_MAX_EDGE,
+    fit: 'inside',
+    withoutEnlargement: true
+  })
+  .jpeg({ quality: 75 })
+  .toBuffer()
+
 exports.main = async (event = {}) => {
+  const startedAt = Date.now()
+  let stageStartedAt = startedAt
+  const stagesMs = {}
+  const finishStage = (name) => {
+    const now = Date.now()
+    stagesMs[name] = now - stageStartedAt
+    stageStartedAt = now
+  }
   const fileID = typeof event.fileID === 'string' ? event.fileID : ''
+  const workingFileID = typeof event.workingFileID === 'string' ? event.workingFileID : ''
   const assetId = typeof event.assetId === 'string' ? event.assetId : ''
   const wxContext = cloud.getWXContext()
   const openid = wxContext.OPENID
@@ -101,6 +144,7 @@ exports.main = async (event = {}) => {
   if (!openid) return fail('UNAUTHORIZED', '请先登录后再上传图片。')
   if (!assetId) return fail('INVALID_ASSET', '图片上传任务无效，请重新选择。')
   if (!fileID.startsWith('cloud://')) return fail('INVALID_FILE', '图片上传信息无效，请重新选择。')
+  if (workingFileID && !workingFileID.startsWith('cloud://')) return fail('INVALID_FILE', '工作图片上传信息无效，请重新选择。')
 
   let uploadAsset
   try {
@@ -108,11 +152,12 @@ exports.main = async (event = {}) => {
       const result = await transaction.collection('imageAssets').doc(assetId).get()
       const asset = result.data
       if (!asset || asset.userId !== openid || asset.status !== 'uploading') return null
-      if (!asset.stagingPath || !fileID.endsWith(`/${asset.stagingPath}`)) return null
+      if (!matchesUploadTicket(asset, fileID, workingFileID)) return null
       await transaction.collection('imageAssets').doc(assetId).update({
         data: {
           status: 'processing',
           stagingFileId: fileID,
+          workingStagingFileId: workingFileID,
           updatedAt: db.serverDate()
         }
       })
@@ -123,58 +168,67 @@ exports.main = async (event = {}) => {
     return fail('PREPARE_FAILED', '图片处理失败，请稍后重试。')
   }
   if (!uploadAsset) return fail('INVALID_ASSET', '图片上传任务无效或已处理，请重新选择。')
+  finishStage('claimMs')
 
   let input
-  try {
-    const result = await cloud.downloadFile({ fileID })
-    input = result.fileContent
-  } catch (error) {
-    console.error('下载暂存图片失败:', error)
-    await markAssetFailed(assetId, 'DOWNLOAD_FAILED')
-    return fail('DOWNLOAD_FAILED', '图片上传未完成，请重新选择。')
-  }
-
-  const inputBytes = Buffer.byteLength(input)
-  if (inputBytes === 0) {
-    await markAssetFailed(assetId, 'EMPTY_FILE')
-    return fail('EMPTY_FILE', '图片文件为空，请重新选择。')
-  }
-  if (inputBytes > MAX_BYTES) {
-    await markAssetFailed(assetId, 'FILE_TOO_LARGE')
-    return fail('FILE_TOO_LARGE', '图片不能超过 6MB，请重新选择。')
-  }
-
-  const magicType = detectMagicType(input)
-  if (!ALLOWED_FORMATS.has(magicType)) {
-    await markAssetFailed(assetId, 'UNSUPPORTED_IMAGE')
-    return fail('UNSUPPORTED_IMAGE', '暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。')
-  }
-
   let metadata
   let derived
   try {
-    metadata = await sharp(input, { limitInputPixels: MAX_PIXELS }).metadata()
-    if (!ALLOWED_FORMATS.has(metadata.format)) {
-      await markAssetFailed(assetId, 'UNSUPPORTED_IMAGE')
-      return fail('UNSUPPORTED_IMAGE', '暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。')
+    const result = await downloadAndDerive({
+      originalFileID: fileID,
+      workingFileID,
+      downloadFile: async (downloadFileID) => {
+        try {
+          return (await cloud.downloadFile({ fileID: downloadFileID })).fileContent
+        } catch (error) {
+          throw inputError('DOWNLOAD_FAILED')
+        }
+      },
+      derive: async (workingInput) => {
+        const workingMetadata = await inspectInput(workingInput)
+        if (workingFileID && Math.max(workingMetadata.width, workingMetadata.height) > 2064) {
+          throw inputError('INVALID_IMAGE')
+        }
+        return { metadata: workingMetadata, images: await buildDerivedImages(workingInput) }
+      }
+    })
+    input = result.originalBuffer
+    metadata = await inspectInput(input)
+    if (workingFileID && Math.abs(imageAspect(metadata) / imageAspect(result.derived.metadata) - 1) > 0.03) {
+      throw inputError('INVALID_IMAGE')
     }
-    if (!metadata.width || !metadata.height) {
-      await markAssetFailed(assetId, 'INVALID_IMAGE')
-      return fail('INVALID_IMAGE', '图片无法读取，请重新选择。')
-    }
-    derived = await buildDerivedImages(input)
+    derived = result.derived.images
+    stagesMs.downloadMs = result.timings.originalDownloadMs
+    stagesMs.workingDownloadMs = result.timings.workingDownloadMs
+    stagesMs.deriveMs = result.timings.deriveMs
+    stagesMs.inputWallMs = result.timings.inputWallMs
+    stageStartedAt = Date.now()
   } catch (error) {
-    console.warn('图片解码或派生失败:', error && error.message ? error.message : String(error))
-    await markAssetFailed(assetId, 'INVALID_IMAGE')
-    return fail('INVALID_IMAGE', '图片无法读取，请重新选择。')
+    const code = ['DOWNLOAD_FAILED', 'EMPTY_FILE', 'FILE_TOO_LARGE', 'UNSUPPORTED_IMAGE', 'INVALID_IMAGE'].includes(error?.code)
+      ? error.code : 'INVALID_IMAGE'
+    console.warn('图片下载或派生失败:', code, error?.message || String(error))
+    await markAssetFailed(assetId, code)
+    await bestEffortDeleteFiles([fileID, workingFileID])
+    const messages = {
+      DOWNLOAD_FAILED: '图片上传未完成，请重新选择。',
+      EMPTY_FILE: '图片文件为空，请重新选择。',
+      FILE_TOO_LARGE: '图片不能超过 6MB，请重新选择。',
+      UNSUPPORTED_IMAGE: '暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。',
+      INVALID_IMAGE: '图片无法读取，请重新选择。'
+    }
+    return fail(code, messages[code])
   }
+  const inputBytes = input.length
 
   try {
     await checkImage(cloud, derived.thumbnailBuffer)
+    // 工作图与原图来自两次独立上传，不能仅凭尺寸比例认定内容一致。
+    if (workingFileID) await checkImage(cloud, await buildSafetyThumbnail(input))
+    finishStage('securityMs')
   } catch (error) {
     const rejected = error?.message === 'CONTENT_REJECTED'
     await markAssetFailed(assetId, rejected ? 'CONTENT_REJECTED' : 'CONTENT_CHECK_UNAVAILABLE')
-    await bestEffortDelete(fileID)
+    await bestEffortDeleteFiles([fileID, workingFileID])
     return rejected
       ? fail('CONTENT_REJECTED', '图片内容含违规信息，请更换后重试。')
       : fail('CONTENT_CHECK_UNAVAILABLE', '图片内容校验暂不可用，请稍后重试。')
@@ -207,6 +261,7 @@ exports.main = async (event = {}) => {
             metadata: toPublicMetadata(metadata),
             safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() },
             stagingFileId: '',
+            workingStagingFileId: '',
             errorCode: '',
             readyAt: db.serverDate(),
             updatedAt: db.serverDate(),
@@ -215,8 +270,11 @@ exports.main = async (event = {}) => {
         })
       }
     })
+    finishStage('saveMs')
 
-    await bestEffortDelete(fileID)
+    await bestEffortDeleteFiles([fileID, workingFileID])
+    finishStage('cleanupMs')
+    console.info('[prepareImageTiming]', { ...stagesMs, totalMs: Date.now() - startedAt, inputBytes })
 
     return {
       ok: true,

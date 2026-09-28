@@ -19,7 +19,14 @@
       "runtime": "Nodejs20.19",
       "timeout": 15,
       "memorySize": 256,
-      "installDependency": true
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "refresh-home-blog-every-5-minutes",
+          "type": "timer",
+          "config": "0 */5 * * * * *"
+        }
+      ]
     },
     {
       "name": "userProfile",

@@ -1,6 +1,6 @@
 const cloud = require('wx-server-sdk')
 const { randomUUID } = require('node:crypto')
-const { createStagingPath } = require('./upload-core')
+const { createUploadPaths } = require('./upload-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -14,22 +14,27 @@ exports.main = async (event = {}) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext.OPENID
   const extension = typeof event.extension === 'string' ? event.extension.toLowerCase().replace(/^\./, '') : ''
+  const workingExtension = typeof event.workingExtension === 'string' ? event.workingExtension.toLowerCase().replace(/^\./, '') : ''
 
   if (!openid) return fail('UNAUTHORIZED', '请先登录后再上传图片。')
   if (!ALLOWED_EXTENSIONS.has(extension)) {
     return fail('UNSUPPORTED_IMAGE', '暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。')
   }
+  if (workingExtension && !ALLOWED_EXTENSIONS.has(workingExtension)) {
+    return fail('UNSUPPORTED_IMAGE', '工作图片格式无效，请重新选择。')
+  }
 
   // 让 CloudBase 生成数据库文档 ID；暂存对象使用独立随机标识，避免依赖
   // 不同 SDK 版本对自定义文档 ID / set() 的兼容差异。
   const stagingToken = randomUUID()
-  const stagingPath = createStagingPath(openid, stagingToken, extension)
+  const { stagingPath, workingStagingPath } = createUploadPaths(openid, stagingToken, extension, workingExtension)
   try {
     const result = await db.collection('imageAssets').add({
       data: {
         userId: openid,
         status: 'uploading',
         stagingPath,
+        workingStagingPath,
         createdAt: db.serverDate(),
         updatedAt: db.serverDate(),
         expiresAt: new Date(Date.now() + STAGING_TTL_MS)
@@ -37,7 +42,7 @@ exports.main = async (event = {}) => {
     })
     const assetId = result?._id
     if (!assetId) throw new Error('CloudBase 未返回图片资产文档 ID')
-    return { ok: true, data: { assetId, stagingPath } }
+    return { ok: true, data: { assetId, stagingPath, workingStagingPath } }
   } catch (error) {
     console.error('创建图片上传凭证失败:', error)
     const errorText = `${error?.code || ''} ${error?.errCode || ''} ${error?.message || ''} ${error?.errMsg || ''}`

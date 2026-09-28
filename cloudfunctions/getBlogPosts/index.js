@@ -3,7 +3,20 @@ const { HIDDEN_CATEGORY_IDS, isHiddenPost, normalizeCategories, normalizePost } 
 const WORDPRESS_API_BASE = String(process.env.WORDPRESS_API_BASE || 'https://shengxiluo.me/wp-json/wp/v2').replace(/\/$/, '')
 const CACHE_TTL_MS = 5 * 60 * 1000
 const CATEGORY_CACHE_TTL_MS = 60 * 60 * 1000
+const HOME_SNAPSHOT_COLLECTION = 'blogHomeCache'
+const HOME_SNAPSHOT_ID = 'latest-three'
+const HOME_REFRESH_TRIGGER = 'refresh-home-blog-every-5-minutes'
 const cache = new Map()
+let sharedDb
+
+const getDatabase = () => {
+  if (!sharedDb) {
+    const cloud = require('wx-server-sdk')
+    cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
+    sharedDb = cloud.database()
+  }
+  return sharedDb
+}
 
 const fail = (code, message) => ({ ok: false, code, message })
 
@@ -50,13 +63,26 @@ const withCache = async (key, request, ttlMs = CACHE_TTL_MS) => {
   throw lastError
 }
 
-exports.main = async (event = {}) => {
+const createHandler = ({ database = getDatabase, request = fetchJson } = {}) => async (event = {}) => {
   const action = event.action === 'detail' || event.action === 'categories' ? event.action : 'list'
   try {
+    const isHomeRefresh = event.Type === 'Timer' && event.TriggerName === HOME_REFRESH_TRIGGER
+    if (isHomeRefresh) {
+      const result = await request(buildListPath({ page: 1, pageSize: 3 }))
+      if (!Array.isArray(result.data)) throw new Error('WordPress 首页文章格式无效')
+      const snapshot = {
+        posts: result.data.map((post) => normalizePost(post, { includeContent: false })),
+        totalPages: result.totalPages,
+        updatedAtMs: Date.now()
+      }
+      await database().collection(HOME_SNAPSHOT_COLLECTION).doc(HOME_SNAPSHOT_ID).set({ data: snapshot })
+      return { ok: true, data: { updatedAtMs: snapshot.updatedAtMs, count: snapshot.posts.length } }
+    }
+
     if (action === 'detail') {
       const postId = Number(event.postId)
       if (!Number.isInteger(postId) || postId <= 0) return fail('INVALID_POST', '文章不存在或已下线。')
-      const result = await withCache(`detail:${postId}`, () => fetchJson(`/posts/${postId}?_embed=1`))
+      const result = await withCache(`detail:${postId}`, () => request(`/posts/${postId}?_embed=1`))
       if (isHiddenPost(result.data)) return fail('POST_NOT_FOUND', '文章不存在或已下线。')
       return { ok: true, data: { post: normalizePost(result.data) } }
     }
@@ -64,7 +90,7 @@ exports.main = async (event = {}) => {
     if (action === 'categories') {
       const result = await withCache(
         'categories',
-        () => fetchJson('/categories?per_page=100&hide_empty=true&orderby=count&order=desc'),
+        () => request('/categories?per_page=100&hide_empty=true&orderby=count&order=desc'),
         CATEGORY_CACHE_TTL_MS
       )
       return { ok: true, data: { categories: normalizeCategories(result.data) } }
@@ -73,11 +99,36 @@ exports.main = async (event = {}) => {
     const page = Math.max(1, Number(event.page) || 1)
     const pageSize = Math.min(10, Math.max(1, Number(event.pageSize) || 3))
     const categoryId = Number.isInteger(Number(event.categoryId)) && Number(event.categoryId) > 0 ? Number(event.categoryId) : 0
-    const result = await withCache(`list:${page}:${pageSize}:${categoryId}`, () => fetchJson(buildListPath({ page, pageSize, categoryId })))
+    const isHomeList = page === 1 && pageSize === 3 && categoryId === 0
+    if (isHomeList) {
+      try {
+        const snapshot = (await database().collection(HOME_SNAPSHOT_COLLECTION).doc(HOME_SNAPSHOT_ID).get()).data
+        if (snapshot && Array.isArray(snapshot.posts)) {
+          return {
+            ok: true,
+            data: { posts: snapshot.posts, page, pageSize, totalPages: snapshot.totalPages || 1, hasMore: (snapshot.totalPages || 1) > 1 }
+          }
+        }
+      } catch (error) {
+        console.warn('读取首页博客快照失败，回源 WordPress:', error?.message || error)
+      }
+    }
+
+    const result = await withCache(`list:${page}:${pageSize}:${categoryId}`, () => request(buildListPath({ page, pageSize, categoryId })))
+    const posts = (Array.isArray(result.data) ? result.data : []).map((post) => normalizePost(post, { includeContent: false }))
+    if (isHomeList) {
+      try {
+        await database().collection(HOME_SNAPSHOT_COLLECTION).doc(HOME_SNAPSHOT_ID).set({
+          data: { posts, totalPages: result.totalPages, updatedAtMs: Date.now() }
+        })
+      } catch (error) {
+        console.warn('写入首页博客快照失败:', error?.message || error)
+      }
+    }
     return {
       ok: true,
       data: {
-        posts: (Array.isArray(result.data) ? result.data : []).map((post) => normalizePost(post, { includeContent: false })),
+        posts,
         page,
         pageSize,
         totalPages: result.totalPages,
@@ -90,4 +141,6 @@ exports.main = async (event = {}) => {
   }
 }
 
+exports.main = createHandler()
 module.exports.buildListPath = buildListPath
+module.exports.createHandler = createHandler

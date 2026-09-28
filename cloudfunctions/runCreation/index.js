@@ -218,7 +218,17 @@ const generateContent = async (task, draft, understanding, config) => {
       timeoutMs: config.settings.requestTimeoutMs,
       messages: [
         { role: 'system', content: SAFETY_SYSTEM_PROMPT },
-        { role: 'user', content: `根据以下照片理解创作五言绝句。只返回 JSON：{"type":"poem","poem":{"title":"","lines":["五个汉字","五个汉字","五个汉字","五个汉字"]}}。四句每句恰好五个汉字。\n${context}` }
+        { role: 'user', content: `请根据以下照片理解，创作一首五言绝句。以照片中可见的景物、光线或动作立意，写出与画面相称的意境；结合用户补充的信息与所选感觉表达情绪。不要把未经证实的地点、人物关系或故事写成照片事实。
+
+全诗四句，每句恰好五个汉字。认真考虑五言绝句的平仄与押韵，尽量采用通行格律，使第二、四句押韵；写完后自行检查并润色。若严格合律会迫使你凑字、用生硬的词，或损害照片意境与情绪表达，应优先保证内容贴切、语言自然，不必为合律牺牲好诗。标题简洁，呼应全诗。
+
+mood 含义：auto 为顺应画面自然表达，warm 为温暖，quiet 为安静，humorous 为幽默，healing 为治愈。
+
+只返回 JSON，不要附加解释：
+{"type":"poem","poem":{"title":"","lines":["","","",""]}}
+
+创作依据：
+${context}` }
       ]
     }))
     const content = cleanJson(result.content)
@@ -230,8 +240,27 @@ const generateContent = async (task, draft, understanding, config) => {
   }
 
   const outputSchema = draft.generateType === 'review'
-    ? '{"type":"review","review":{"headline":"","body":"40到80字","observations":["",""]}}'
-    : '{"type":"copy","copy":{"label":"","headline":"","body":"","hashtags":["#", "#"]}}'
+    ? '{"type":"review","review":{"headline":"","body":"","observations":["",""]}}'
+    : '{"type":"copy","copy":{"label":"","headline":"","body":"","hashtags":["",""]}}'
+  const userPrompt = draft.generateType === 'review'
+    ? `请根据以下照片理解，写一则侧重拍摄技术质量的中文图片点评。重点观察构图与主体安排、光线与明暗、色彩、清晰度和画面层次；只点评照片中确实能看出的要素，挑最值得说的两点，不必逐项套用。既指出有效的拍摄处理，也可以给出具体、温和的改进建议。
+
+不要凭画面猜测相机、镜头、焦距、曝光参数或后期操作；不要虚构拍摄过程、人物身份或地点。标题点出这张照片最鲜明的视觉特点。正文写 40～80 个汉字，observations 填两条简短、具体的观察。
+
+只返回 JSON，不要附加解释：
+${outputSchema}
+
+点评依据：
+${context}`
+    : `请根据以下照片理解，写一段适合与照片一起分享的中文配图文案。以画面可见内容为起点，自然结合用户填写的地点、补充的「这一刻发生了什么」以及所选感觉；不要机械复述输入。地点或补充内容为空时不要自行编造，也不要把用户提供但画面无法验证的信息写成亲眼所见。
+
+mood 含义：auto 为顺应画面自然表达，warm 为温暖，quiet 为安静，humorous 为幽默，healing 为治愈。文字应有具体画面感，语气贴合所选感觉，简洁、自然，避免空泛感叹和夸张营销语。headline 用一句话抓住这一刻；body 可稍作展开；hashtags 只写与内容确实相关的标签。
+
+只返回 JSON，不要附加解释：
+${outputSchema}
+
+创作依据：
+${context}`
   const result = await callWithRetry(task, config, () => callChat({
     ...config.qwen,
     temperature: config.settings.generationTemperature,
@@ -239,7 +268,7 @@ const generateContent = async (task, draft, understanding, config) => {
     timeoutMs: config.settings.requestTimeoutMs,
     messages: [
       { role: 'system', content: SAFETY_SYSTEM_PROMPT },
-      { role: 'user', content: `根据以下照片理解生成中文${draft.generateType === 'review' ? '图片点评' : '配图文案'}。不捏造画面，不含敏感个人信息。只返回 JSON：${outputSchema}\n${context}` }
+      { role: 'user', content: userPrompt }
     ]
   }))
   const content = cleanJson(result.content)

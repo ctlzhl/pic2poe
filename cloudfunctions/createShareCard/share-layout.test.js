@@ -1,62 +1,88 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { landscapePoemLayout, portraitPoemLayout, editorialTypography, editorialLayoutFor, editorialSideBySideLayout } = require('./share-layout')
+const {
+  landscapePoemLayout,
+  portraitPoemLayout,
+  editorialTypography,
+  editorialLayoutFor,
+  editorialSideBySideLayout,
+  editorialStackedLayout,
+  visualImageAspect
+} = require('./share-layout')
 
-test('横版诗卡的标题与正文以画布中心轴对齐', () => {
-  const layout = landscapePoemLayout()
+test('横图诗卡的原图铺满成品宽度且保持比例', () => {
+  const layout = landscapePoemLayout({ imageAspect: 16 / 9 })
 
-  assert.deepEqual(layout.text, { x: 720, anchor: 'middle', titleY: 172, bodyY: 300 })
-  assert.deepEqual(layout.photo, { left: 0, top: 780, width: 1440, height: 1020, fit: 'contain', position: 'centre' })
+  assert.equal(layout.canvas.width, 1440)
+  assert.equal(layout.photo.left, 0)
+  assert.equal(layout.photo.width, layout.canvas.width)
+  assert.equal(layout.photo.top + layout.photo.height, layout.canvas.height)
+  assert.equal(layout.photo.height, 810)
+  assert.equal(layout.photo.fit, 'cover')
+  assert.equal(layout.text.x, 720)
+  assert.ok(layout.qr.top + layout.qr.size < layout.photo.top)
 })
 
-test('竖版诗卡完整保留原图比例，正文在右侧留白中居中', () => {
-  const layout = portraitPoemLayout({ titleLineCount: 1, poemLineCount: 4, imageAspect: 0.75 })
+test('方图诗卡采用上下布局，原图铺满成品宽度', () => {
+  assert.equal(editorialLayoutFor({ width: 1200, height: 1200 }).kind, 'stacked')
+  const layout = landscapePoemLayout({ imageAspect: 1 })
 
-  assert.deepEqual(layout.photo, { left: 0, top: 234, width: 1000, height: 1333, fit: 'contain', position: 'centre' })
-  assert.equal(layout.text.x, 1220)
+  assert.equal(layout.photo.width, layout.canvas.width)
+  assert.equal(layout.photo.height, 1440)
+})
+
+test('竖图诗卡的原图铺满成品高度且诗文居中于右侧', () => {
+  const layout = portraitPoemLayout({ titleLineCount: 2, poemLineCount: 4, imageAspect: 0.75 })
+
+  assert.deepEqual(layout.photo, { left: 0, top: 0, width: 1350, height: 1800, fit: 'cover', position: 'centre' })
+  assert.equal(layout.canvas.width, 1990)
+  assert.equal(layout.canvas.height, layout.photo.height)
+  assert.equal(layout.text.x, 1670)
   assert.equal(layout.text.anchor, 'middle')
-  assert.ok(layout.text.titleY > 400)
   assert.ok(layout.text.bodyY > layout.text.titleY)
-  assert.ok(layout.text.bodyY < 1120)
+  assert.ok(layout.text.bodyY + 3 * 90 < layout.qr.top)
+  assert.ok(layout.qr.left >= layout.photo.width)
 })
 
-test('不同竖构图比例都会完整显示且不超出画布', () => {
-  const shortTitle = portraitPoemLayout({ titleLineCount: 1, poemLineCount: 4, imageAspect: 0.75 })
-  const longTitle = portraitPoemLayout({ titleLineCount: 2, poemLineCount: 4, imageAspect: 0.75 })
-  const phonePortrait = portraitPoemLayout({ titleLineCount: 1, poemLineCount: 4, imageAspect: 9 / 16 })
-
-  assert.ok(longTitle.text.titleY < shortTitle.text.titleY)
-  assert.equal(phonePortrait.photo.height, 1704)
-  assert.ok(Math.abs(phonePortrait.photo.width / phonePortrait.photo.height - 9 / 16) < 0.002)
-  assert.equal(longTitle.qr.top, 1580)
-  assert.equal(longTitle.qr.left, 1145)
+test('EXIF 旋转后的可见宽高用于判断版式和计算照片比例', () => {
+  assert.equal(visualImageAspect({ width: 1600, height: 900, orientation: 6 }), 900 / 1600)
+  assert.equal(editorialLayoutFor({ width: 1600, height: 900, orientation: 6 }).kind, 'side-by-side')
 })
 
-test('图评与文案分享卡使用更易阅读的正文排版', () => {
+test('图评与文案的文字版式不预留类型标签行', () => {
   assert.deepEqual(editorialTypography(), {
-    label: { fontSize: 30, lineHeight: 40 },
     title: { fontSize: 64, lineHeight: 84 },
     body: { fontSize: 42, lineHeight: 64 },
     tags: { fontSize: 30, lineHeight: 40 }
   })
 })
 
-test('图评与文案的横图和方图使用上图下文版式', () => {
-  assert.equal(editorialLayoutFor({ width: 1600, height: 900 }).kind, 'stacked')
-  assert.equal(editorialLayoutFor({ width: 1200, height: 1200 }).kind, 'stacked')
-})
-
-test('图评与文案的竖图使用左图右文版式，并识别 EXIF 旋转', () => {
-  assert.equal(editorialLayoutFor({ width: 900, height: 1600 }).kind, 'side-by-side')
-  assert.equal(editorialLayoutFor({ width: 1600, height: 900, orientation: 6 }).kind, 'side-by-side')
-})
-
-test('竖图的右侧文字区能容纳既定的标题与正文行宽', () => {
+test('竖图图评与文案的原图铺满成品高度，文字和二维码只在右侧', () => {
   const layout = editorialSideBySideLayout({ imageAspect: 0.99, titleLineCount: 3, bodyLineCount: 6 })
 
-  assert.equal(layout.photo.left, 0)
-  assert.equal(layout.text.anchor, 'start')
-  assert.ok(layout.text.x + 12 * 42 <= 1440)
+  assert.equal(layout.photo.top, 0)
+  assert.equal(layout.photo.height, layout.canvas.height)
+  assert.equal(layout.photo.width, 1782)
+  assert.equal(layout.photo.fit, 'cover')
+  assert.ok(layout.text.x + 12 * 42 <= layout.canvas.width - 64)
   assert.ok(layout.text.tagsY < layout.qr.top)
+  assert.ok(layout.qr.left >= layout.photo.width)
+  assert.ok(layout.qr.left + layout.qr.size < layout.canvas.width)
+})
+
+test('横图与方图图评、文案的原图铺满成品宽度，文字从照片下方开始', () => {
+  for (const imageAspect of [16 / 9, 1]) {
+    const layout = editorialStackedLayout({ imageAspect, titleLineCount: 2, bodyLineCount: 4 })
+
+    assert.equal(layout.canvas.width, 1440)
+    assert.equal(layout.photo.left, 0)
+    assert.equal(layout.photo.top, 0)
+    assert.equal(layout.photo.width, layout.canvas.width)
+    assert.equal(layout.photo.height, Math.round(1440 / imageAspect))
+    assert.equal(layout.photo.fit, 'cover')
+    assert.ok(layout.text.titleY > layout.photo.height)
+    assert.ok(layout.text.tagsY < layout.qr.top)
+    assert.ok(layout.qr.top + layout.qr.size < layout.canvas.height)
+  }
 })

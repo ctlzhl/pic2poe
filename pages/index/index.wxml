@@ -18,6 +18,7 @@
     </view>
     <view wx:if="{{preparing}}" class="image-status">{{prepareMessage || '正在准备图片…'}}</view>
     <view wx:elif="{{prepareState === 'ready'}}" class="image-status ready">图片已准备好</view>
+    <view wx:elif="{{prepareState === 'error'}}" class="image-status error">{{prepareMessage}}</view>
     <view wx:if="{{imageUrl && !preparing}}" class="change-mask">点击更换图片</view>
   </view>
 
@@ -30,7 +31,7 @@
     <view class="guide-item"><text>3</text>查看并保存你的作品</view>
   </view>
 
-  <view wx:if="{{assetId}}" class="creation-form">
+  <view wx:if="{{showCreationForm}}" class="creation-form">
     <view class="section">
       <view class="section-label">选择想要的类型</view>
       <view class="type-list">
@@ -60,7 +61,7 @@
 
   </view>
 
-  <view wx:if="{{assetId}}" class="creation-action-bar">
+  <view wx:if="{{showCreationForm}}" class="creation-action-bar">
     <button class="primary-button" loading="{{submitting}}" disabled="{{preparing || submitting || !assetId}}" bindtap="startCreation">开始创作</button>
   </view>
 </view>

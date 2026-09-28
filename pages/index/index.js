@@ -2,6 +2,7 @@ const { uploadFileWithTimeout, callFunctionWithTimeout } = require('../../utils/
 const { showErrorToast } = require('../../utils/errorHandler')
 const { ALLOWED_IMAGE_EXTENSIONS, getImageExtensionFromPath } = require('../../utils/image')
 const { requirePrivacyAuthorization } = require('../../utils/privacy')
+const { createWorkingImage } = require('../../utils/workingImage')
 
 const MAX_FILE_SIZE = 6 * 1024 * 1024
 const PREPARE_TIMEOUT = 30000
@@ -45,6 +46,7 @@ const getFailureMessage = (result, fallback) => result?.message || fallback
 Page({
   data: {
     imageUrl: '',
+    showCreationForm: false,
     assetId: '',
     idempotencyKey: '',
     prepareState: 'idle',
@@ -71,6 +73,7 @@ Page({
     this.prepareRunId = (this.prepareRunId || 0) + 1
     this.setData({
       imageUrl: '',
+      showCreationForm: false,
       assetId: '',
       idempotencyKey: '',
       prepareState: 'idle',
@@ -88,7 +91,6 @@ Page({
     // 系统相册属于原生全屏页面，也会触发 onHide；此时仍要接收用户刚选中的图片。
     if (this.isChoosingMedia) return
     this.resetDraft()
-    wx.hideLoading()
   },
 
   async chooseImage() {
@@ -97,20 +99,31 @@ Page({
     const prepareRunId = (this.prepareRunId || 0) + 1
     this.prepareRunId = prepareRunId
     const isCurrentRun = () => this.prepareRunId === prepareRunId
-    let loadingShown = false
-    let stagingFileId = ''
-    const cleanupStagingFile = async () => {
-      if (!stagingFileId) return
-      const fileId = stagingFileId
-      stagingFileId = ''
+    const startedAt = Date.now()
+    let stageStartedAt = startedAt
+    const stagesMs = {}
+    const finishStage = (name) => {
+      const now = Date.now()
+      stagesMs[name] = now - stageStartedAt
+      stageStartedAt = now
+    }
+    let outcome = 'cancelled'
+    let inputBytes = 0
+    let working = null
+    let stagingFileIds = []
+    const cleanupStagingFiles = async () => {
+      if (!stagingFileIds.length) return
+      const fileList = stagingFileIds
+      stagingFileIds = []
       try {
-        await wx.cloud.deleteFile({ fileList: [fileId] })
+        await wx.cloud.deleteFile({ fileList })
       } catch (cleanupError) {
         console.warn('回收暂存图片失败:', cleanupError)
       }
     }
     try {
       await requirePrivacyAuthorization()
+      finishStage('privacyMs')
       this.isChoosingMedia = true
       let selection
       try {
@@ -123,10 +136,12 @@ Page({
       } finally {
         this.isChoosingMedia = false
       }
+      finishStage('selectionMs')
       const file = selection.tempFiles?.[0]
       const tempFilePath = file?.tempFilePath || ''
       if (!tempFilePath) throw new Error('未获取到图片路径')
-      if (!isCurrentRun()) return
+      inputBytes = file.size || 0
+      if (!isCurrentRun()) { outcome = 'abandoned'; return }
       if (file.size > MAX_FILE_SIZE) throw new Error('图片过大，请选择 6MB 以内的图片。')
 
       let extension = ''
@@ -136,6 +151,7 @@ Page({
         console.warn('客户端图片格式识别失败，将由云端继续校验：', error)
       }
       if (HEIC_EXTENSIONS.has(extension)) {
+        outcome = 'unsupported'
         wx.showModal({
           title: '暂不支持 HEIC 图片',
           content: '请先将照片导出为 JPG，或在 iPhone「设置－相机－格式」中选择“兼容性最佳”后再拍摄。',
@@ -145,40 +161,78 @@ Page({
         return
       }
       if (!extension) throw new Error('暂不支持这种图片格式，请选择 JPG、PNG 或 WebP。')
-      if (!isCurrentRun()) return
+      finishStage('formatMs')
+      if (!isCurrentRun()) { outcome = 'abandoned'; return }
 
       this.setData({
         imageUrl: tempFilePath,
+        showCreationForm: true,
         assetId: '',
         idempotencyKey: '',
         prepareState: 'pending',
         preparing: true,
         prepareMessage: '正在创建上传任务…'
       })
-      wx.showLoading({ title: '正在创建上传任务…', mask: true })
-      loadingShown = true
 
-      const uploadTicket = await callFunctionWithTimeout('createImageUpload', { extension })
-      if (!isCurrentRun()) return
+      const expectedWorkingExtension = extension === 'jpeg' ? 'jpg' : extension
+      const ticketStartedAt = Date.now()
+      const ticketPromise = callFunctionWithTimeout('createImageUpload', {
+        extension,
+        workingExtension: expectedWorkingExtension
+      })
+      const localStartedAt = Date.now()
+      const workingPromise = createWorkingImage(tempFilePath, inputBytes)
+      const [uploadTicket, preparedWorking] = await Promise.all([
+        ticketPromise.then((ticket) => {
+          stagesMs.createUploadMs = Date.now() - ticketStartedAt
+          return ticket
+        }),
+        workingPromise.then((image) => {
+          stagesMs.localWorkMs = Date.now() - localStartedAt
+          return image
+        })
+      ])
+      working = preparedWorking?.extension === expectedWorkingExtension ? preparedWorking : null
+      stageStartedAt = Date.now()
+      if (!isCurrentRun()) { outcome = 'abandoned'; return }
       if (!uploadTicket.result?.ok) {
         console.error('createImageUpload 返回失败:', uploadTicket.result)
         throw new Error(getFailureMessage(uploadTicket.result, '创建上传任务失败，请稍后重试。'))
       }
-      const { assetId, stagingPath } = uploadTicket.result.data
+      const { assetId, stagingPath, workingStagingPath } = uploadTicket.result.data
       this.setData({ prepareMessage: '正在上传照片…' })
-      wx.showLoading({ title: '正在上传照片…', mask: true })
-      const upload = await uploadFileWithTimeout(stagingPath, tempFilePath)
-      stagingFileId = upload.fileID
+      const uploads = [{ cloudPath: stagingPath, filePath: tempFilePath }]
+      if (working && workingStagingPath) uploads.push({ cloudPath: workingStagingPath, filePath: working.path })
+      const settled = await Promise.allSettled(uploads.map(({ cloudPath, filePath }) => uploadFileWithTimeout(cloudPath, filePath)))
+      stagingFileIds = settled
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value?.fileID)
+        .filter(Boolean)
+      finishStage('uploadMs')
+      const originalUpload = settled[0]
+      if (originalUpload.status === 'rejected') throw originalUpload.reason
+      if (!originalUpload.value?.fileID) throw new Error('图片上传未完成，请重试。')
+      const workingUpload = settled[1]
+      if (workingUpload && (workingUpload.status === 'rejected' || !workingUpload.value?.fileID)) {
+        console.warn('工作图上传失败，改用原图处理:', workingUpload.reason || '未返回文件 ID')
+        working = null
+      }
       if (!isCurrentRun()) {
-        await cleanupStagingFile()
+        outcome = 'abandoned'
+        await cleanupStagingFiles()
         return
       }
       this.setData({ prepareMessage: '正在优化图片…' })
-      wx.showLoading({ title: '正在优化图片…', mask: true })
-      const response = await callFunctionWithTimeout('prepareImage', { assetId, fileID: upload.fileID }, PREPARE_TIMEOUT)
+      const response = await callFunctionWithTimeout('prepareImage', {
+        assetId,
+        fileID: originalUpload.value.fileID,
+        ...(workingUpload?.status === 'fulfilled' && workingUpload.value?.fileID
+          ? { workingFileID: workingUpload.value.fileID } : {})
+      }, PREPARE_TIMEOUT)
+      finishStage('prepareMs')
       if (!response.result?.ok) throw new Error(getFailureMessage(response.result, '图片处理失败，请换一张再试。'))
-      stagingFileId = ''
-      if (!isCurrentRun()) return
+      stagingFileIds = []
+      if (!isCurrentRun()) { outcome = 'abandoned'; return }
 
       this.setData({
         assetId,
@@ -186,18 +240,18 @@ Page({
         prepareState: 'ready',
         prepareMessage: '图片已准备好'
       })
+      outcome = 'ready'
     } catch (error) {
       if (error?.errMsg?.includes('cancel')) return
-      await cleanupStagingFile()
-      if (!isCurrentRun()) return
+      await cleanupStagingFiles()
+      if (!isCurrentRun()) { outcome = 'abandoned'; return }
+      outcome = 'failed'
       console.error('上传并处理图片失败:', error)
-      this.setData({ assetId: '', prepareState: 'error', prepareMessage: '' })
+      this.setData({ assetId: '', prepareState: 'error', prepareMessage: '图片准备失败，点按照片重试' })
       showErrorToast(error, '图片处理失败，请换一张再试。')
     } finally {
-      // 用户在系统选图界面取消时，尚未显示 loading；此时不能调用 hideLoading。
-      if (!isCurrentRun()) return
-      if (loadingShown) wx.hideLoading()
-      this.setData({ preparing: false })
+      console.info('[imageUploadTiming]', { outcome, inputBytes, workingBytes: working?.bytes || 0, ...stagesMs, totalMs: Date.now() - startedAt })
+      if (isCurrentRun()) this.setData({ preparing: false })
     }
   },
 
