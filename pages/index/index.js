@@ -70,6 +70,7 @@ Page({
 
   resetDraft() {
     // Tab 页会被缓存；离开后必须清掉本次尚未提交的创作状态。
+    this.cancelActivePreparation?.()
     this.prepareRunId = (this.prepareRunId || 0) + 1
     this.setData({
       imageUrl: '',
@@ -99,6 +100,9 @@ Page({
     const prepareRunId = (this.prepareRunId || 0) + 1
     this.prepareRunId = prepareRunId
     const isCurrentRun = () => this.prepareRunId === prepareRunId
+    let cancelPreparation
+    const abandonedPromise = new Promise((resolve) => { cancelPreparation = resolve })
+    this.cancelActivePreparation = cancelPreparation
     const startedAt = Date.now()
     let stageStartedAt = startedAt
     const stagesMs = {}
@@ -181,19 +185,12 @@ Page({
         workingExtension: expectedWorkingExtension
       })
       const localStartedAt = Date.now()
-      const workingPromise = createWorkingImage(tempFilePath, inputBytes)
-      const [uploadTicket, preparedWorking] = await Promise.all([
-        ticketPromise.then((ticket) => {
-          stagesMs.createUploadMs = Date.now() - ticketStartedAt
-          return ticket
-        }),
-        workingPromise.then((image) => {
-          stagesMs.localWorkMs = Date.now() - localStartedAt
-          return image
-        })
-      ])
-      working = preparedWorking?.extension === expectedWorkingExtension ? preparedWorking : null
-      stageStartedAt = Date.now()
+      const workingPromise = createWorkingImage(tempFilePath, inputBytes).then(
+        (image) => { stagesMs.localWorkMs = Date.now() - localStartedAt; return { image } },
+        (error) => { stagesMs.localWorkMs = Date.now() - localStartedAt; return { error } }
+      )
+      const uploadTicket = await ticketPromise
+      stagesMs.createUploadMs = Date.now() - ticketStartedAt
       if (!isCurrentRun()) { outcome = 'abandoned'; return }
       if (!uploadTicket.result?.ok) {
         console.error('createImageUpload 返回失败:', uploadTicket.result)
@@ -201,14 +198,30 @@ Page({
       }
       const { assetId, stagingPath, workingStagingPath } = uploadTicket.result.data
       this.setData({ prepareMessage: '正在上传照片…' })
-      const uploads = [{ cloudPath: stagingPath, filePath: tempFilePath }]
-      if (working && workingStagingPath) uploads.push({ cloudPath: workingStagingPath, filePath: working.path })
-      const settled = await Promise.allSettled(uploads.map(({ cloudPath, filePath }) => uploadFileWithTimeout(cloudPath, filePath)))
+      const uploadStartedAt = Date.now()
+      const settleUpload = (promise) => promise.then(
+        (value) => ({ status: 'fulfilled', value }),
+        (reason) => ({ status: 'rejected', reason })
+      )
+      const originalUploadPromise = settleUpload(uploadFileWithTimeout(stagingPath, tempFilePath))
+      const localResult = await Promise.race([
+        workingPromise,
+        abandonedPromise.then(() => ({ abandoned: true }))
+      ])
+      if (!localResult.abandoned) {
+        if (localResult.error) console.warn('工作图压缩失败，改用原图处理:', localResult.error)
+        const preparedWorking = localResult.image
+        working = preparedWorking?.extension === expectedWorkingExtension ? preparedWorking : null
+      }
+      const workingUploadPromise = working && workingStagingPath && isCurrentRun()
+        ? settleUpload(uploadFileWithTimeout(workingStagingPath, working.path)) : null
+      const settled = await Promise.all([originalUploadPromise, ...(workingUploadPromise ? [workingUploadPromise] : [])])
       stagingFileIds = settled
         .filter((result) => result.status === 'fulfilled')
         .map((result) => result.value?.fileID)
         .filter(Boolean)
-      finishStage('uploadMs')
+      stagesMs.uploadMs = Date.now() - uploadStartedAt
+      stageStartedAt = Date.now()
       const originalUpload = settled[0]
       if (originalUpload.status === 'rejected') throw originalUpload.reason
       if (!originalUpload.value?.fileID) throw new Error('图片上传未完成，请重试。')
@@ -242,8 +255,9 @@ Page({
       })
       outcome = 'ready'
     } catch (error) {
-      if (error?.errMsg?.includes('cancel')) return
+      const cancelledBeforeUpload = error?.errMsg?.includes('cancel') && !this.data.preparing
       await cleanupStagingFiles()
+      if (cancelledBeforeUpload) return
       if (!isCurrentRun()) { outcome = 'abandoned'; return }
       outcome = 'failed'
       console.error('上传并处理图片失败:', error)
@@ -251,6 +265,7 @@ Page({
       showErrorToast(error, '图片处理失败，请换一张再试。')
     } finally {
       console.info('[imageUploadTiming]', { outcome, inputBytes, workingBytes: working?.bytes || 0, ...stagesMs, totalMs: Date.now() - startedAt })
+      if (this.cancelActivePreparation === cancelPreparation) this.cancelActivePreparation = null
       if (isCurrentRun()) this.setData({ preparing: false })
     }
   },

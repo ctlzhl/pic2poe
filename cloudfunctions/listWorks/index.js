@@ -1,5 +1,5 @@
 const cloud = require('wx-server-sdk')
-const { parsePagination } = require('./list-core')
+const { parsePagination, readAssetsByIds } = require('./list-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -26,16 +26,6 @@ const excerptFor = (work) => {
   return work.content?.copy?.body || ''
 }
 
-const readAsset = async (assetId, openid) => {
-  if (!assetId) return null
-  try {
-    const result = await db.collection('imageAssets').doc(assetId).get()
-    return result.data?.userId === openid ? result.data : null
-  } catch (error) {
-    return null
-  }
-}
-
 exports.main = async (event = {}) => {
   const openid = cloud.getWXContext().OPENID
   if (!openid) return fail('UNAUTHORIZED', '请先登录后再查看作品。')
@@ -49,8 +39,8 @@ exports.main = async (event = {}) => {
     ])
     const works = result.data || []
     const total = Number(countResult.total || 0)
-    const assets = await Promise.all(works.map((work) => readAsset(work.imageAssetId, openid)))
-    const fileIds = [...new Set(assets.map((asset) => asset?.thumbnailFileId).filter(Boolean))]
+    const assetsById = await readAssetsByIds(db, works.map((work) => work.imageAssetId), openid)
+    const fileIds = [...new Set(works.map((work) => assetsById.get(work.imageAssetId)?.thumbnailFileId).filter(Boolean))]
     const fileResult = fileIds.length > 0 ? await cloud.getTempFileURL({ fileList: fileIds }) : { fileList: [] }
     const thumbnailUrls = new Map((fileResult.fileList || []).map((file) => [file.fileID, file.tempFileURL || '']))
 
@@ -62,12 +52,12 @@ exports.main = async (event = {}) => {
         pageSize: limit,
         totalPages: Math.max(1, Math.ceil(total / limit)),
         hasMore: page * limit < total,
-        works: works.map((work, index) => ({
+        works: works.map((work) => ({
           workId: work._id,
           type: work.type,
           title: titleFor(work),
           excerpt: excerptFor(work).slice(0, 72),
-          thumbnailUrl: thumbnailUrls.get(assets[index]?.thumbnailFileId) || '',
+          thumbnailUrl: thumbnailUrls.get(assetsById.get(work.imageAssetId)?.thumbnailFileId) || '',
           createdAt: toTimestamp(work.createdAt)
         }))
       }

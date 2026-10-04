@@ -1,5 +1,6 @@
 const cloud = require('wx-server-sdk')
-const { getModelConfig, poemGenerationModel } = require('./model-core')
+const { getModelConfig, poemGenerationModel, buildVisionInstruction } = require('./model-core')
+const { validateContent, callWithRetry } = require('./creation-core')
 const { checkImage, checkText } = require('./security-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
@@ -22,8 +23,12 @@ const cleanJson = (value) => {
   const text = String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) throw new Error('模型没有返回 JSON 对象')
-  return JSON.parse(text.slice(start, end + 1))
+  if (start < 0 || end <= start) throw new Error('MODEL_RESPONSE_INVALID')
+  try {
+    return JSON.parse(text.slice(start, end + 1))
+  } catch (error) {
+    throw new Error('MODEL_RESPONSE_INVALID')
+  }
 }
 
 const extractContent = (payload) => {
@@ -56,7 +61,9 @@ const callChat = async ({ baseUrl, apiKey, model, messages, temperature, maxToke
     })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok || payload.error) {
-      throw new Error(payload?.error?.message || `模型服务返回 ${response.status}`)
+      const error = new Error(payload?.error?.message || `模型服务返回 ${response.status}`)
+      error.status = response.status
+      throw error
     }
     return { content: extractContent(payload), usage: payload.usage || {} }
   } finally {
@@ -66,25 +73,6 @@ const callChat = async ({ baseUrl, apiKey, model, messages, temperature, maxToke
 
 const assertNotTimedOut = (task) => {
   if (!task.deadlineAt || task.deadlineAt < new Date()) throw new Error('TASK_TIMEOUT')
-}
-
-const chineseCharacters = (line) => String(line || '').replace(/[^\u4e00-\u9fff]/g, '')
-
-const validateContent = (type, value) => {
-  if (!value || value.type !== type) throw new Error('INVALID_OUTPUT')
-  if (type === 'poem') {
-    const lines = value.poem?.lines
-    if (!Array.isArray(lines) || lines.length !== 4 || lines.some((line) => chineseCharacters(line).length !== 5)) {
-      throw new Error('INVALID_OUTPUT')
-    }
-  }
-  if (type === 'review' && (!value.review?.headline || !value.review?.body || !Array.isArray(value.review?.observations))) {
-    throw new Error('INVALID_OUTPUT')
-  }
-  if (type === 'copy' && (!value.copy?.headline || !value.copy?.body || !Array.isArray(value.copy?.hashtags))) {
-    throw new Error('INVALID_OUTPUT')
-  }
-  return value
 }
 
 const contentAsText = (value) => JSON.stringify(value || {})
@@ -102,7 +90,7 @@ const assertSafeContent = (value) => {
 const taskError = (error) => {
   const message = error?.message || ''
   if (message === 'TASK_TIMEOUT') return { code: 'TASK_TIMEOUT', message: '这次没有写完，再试一次吧。' }
-  if (message === 'INVALID_OUTPUT') return { code: 'INVALID_OUTPUT', message: '这次创作没有完成，请再试一次。' }
+  if (message === 'INVALID_OUTPUT' || message === 'MODEL_RESPONSE_INVALID') return { code: 'INVALID_OUTPUT', message: '这次创作没有完成，请再试一次。' }
   if (message === 'SAFETY_REJECTED' || message === 'CONTENT_REJECTED') return { code: 'CONTENT_REJECTED', message: '内容含违规信息，请更换后重试。' }
   if (message === 'CONTENT_CHECK_UNAVAILABLE') return { code: 'CONTENT_CHECK_UNAVAILABLE', message: '内容校验暂不可用，请稍后重试。' }
   if (message === 'QWEN_CONFIG_MISSING') return { code: 'MODEL_CONFIG_MISSING', message: '图片理解模型尚未配置，请联系管理员完成配置。' }
@@ -155,54 +143,37 @@ const markFailed = async (task, error) => {
   return publicError
 }
 
-const callWithRetry = async (task, config, callback) => {
-  let lastError
-  for (let retryCount = 0; retryCount <= config.settings.maxRetries; retryCount += 1) {
-    assertNotTimedOut(task)
-    try {
-      const result = await callback()
-      return { ...result, retryCount }
-    } catch (error) {
-      lastError = error
-      if (retryCount >= config.settings.maxRetries || error?.message === 'SAFETY_REJECTED') throw error
-    }
-  }
-  throw lastError
-}
-
 const analyzeImage = async (task, asset, draft, config) => {
   if (!config.qwen.apiKey || !config.qwen.baseUrl || !config.qwen.model) {
     throw new Error('QWEN_CONFIG_MISSING')
   }
   const image = await cloud.downloadFile({ fileID: asset.creationFileId })
   const base64 = image.fileContent.toString('base64')
-  const instruction = [
-    '只描述图片中可见内容，不推断身份、地点、敏感属性或不存在的故事。',
-    '仅返回 JSON：{"scene":"","subjects":[],"actions":[],"emotion":"","visualFocus":[]}。',
-    draft.location ? `用户填写地点：${draft.location}` : '',
-    draft.moment ? `用户补充：${draft.moment}` : ''
-  ].filter(Boolean).join('\n')
-  const result = await callWithRetry(task, config, () => callChat({
-    provider: 'qwen',
-    ...config.qwen,
-    temperature: config.settings.visionTemperature,
-    maxTokens: config.settings.visionMaxTokens,
-    timeoutMs: config.settings.requestTimeoutMs,
-    messages: [
-      { role: 'system', content: SAFETY_SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: instruction },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
-        ]
-      }
-    ]
-  }))
-  const understanding = cleanJson(result.content)
-  if (understanding?.safe === false) throw new Error('SAFETY_REJECTED')
+  const instruction = buildVisionInstruction(draft)
+  const result = await callWithRetry(task, config.settings, async (timeoutMs) => {
+    const response = await callChat({
+      provider: 'qwen',
+      ...config.qwen,
+      temperature: config.settings.visionTemperature,
+      maxTokens: config.settings.visionMaxTokens,
+      timeoutMs,
+      messages: [
+        { role: 'system', content: SAFETY_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: instruction },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
+          ]
+        }
+      ]
+    })
+    const understanding = cleanJson(response.content)
+    if (understanding?.safe === false) throw new Error('SAFETY_REJECTED')
+    return { ...response, understanding }
+  })
   return {
-    understanding,
+    understanding: result.understanding,
     modelMeta: { provider: 'qwen', model: config.qwen.model, usage: result.usage, retryCount: result.retryCount }
   }
 }
@@ -211,14 +182,15 @@ const generateContent = async (task, draft, understanding, config) => {
   const context = JSON.stringify({ understanding, location: draft.location, moment: draft.moment, mood: draft.mood })
   if (draft.generateType === 'poem') {
     const model = poemGenerationModel(config)
-    const result = await callWithRetry(task, config, () => callChat({
-      ...model,
-      temperature: config.settings.generationTemperature,
-      maxTokens: config.settings.generationMaxTokens,
-      timeoutMs: config.settings.requestTimeoutMs,
-      messages: [
-        { role: 'system', content: SAFETY_SYSTEM_PROMPT },
-        { role: 'user', content: `请根据以下照片理解，创作一首五言绝句。以照片中可见的景物、光线或动作立意，写出与画面相称的意境；结合用户补充的信息与所选感觉表达情绪。不要把未经证实的地点、人物关系或故事写成照片事实。
+    const result = await callWithRetry(task, config.settings, async (timeoutMs, retryCount) => {
+      const response = await callChat({
+        ...model,
+        temperature: config.settings.generationTemperature,
+        maxTokens: config.settings.generationMaxTokens,
+        timeoutMs,
+        messages: [
+          { role: 'system', content: SAFETY_SYSTEM_PROMPT },
+          { role: 'user', content: `请根据以下照片理解，创作一首五言绝句。以照片中可见的景物、光线或动作立意，写出与画面相称的意境；结合用户补充的信息与所选感觉表达情绪。不要把未经证实的地点、人物关系或故事写成照片事实。
 
 全诗四句，每句恰好五个汉字。认真考虑五言绝句的平仄与押韵，尽量采用通行格律，使第二、四句押韵；写完后自行检查并润色。若严格合律会迫使你凑字、用生硬的词，或损害照片意境与情绪表达，应优先保证内容贴切、语言自然，不必为合律牺牲好诗。标题简洁，呼应全诗。
 
@@ -228,13 +200,15 @@ mood 含义：auto 为顺应画面自然表达，warm 为温暖，quiet 为安�
 {"type":"poem","poem":{"title":"","lines":["","","",""]}}
 
 创作依据：
-${context}` }
-      ]
-    }))
-    const content = cleanJson(result.content)
-    if (content?.safe === false) throw new Error('SAFETY_REJECTED')
+${context}${retryCount ? '\n\n前次结果格式不合要求，请重新检查题目、四句诗与 JSON 格式。' : ''}` }
+        ]
+      })
+      const content = cleanJson(response.content)
+      if (content?.safe === false) throw new Error('SAFETY_REJECTED')
+      return { ...response, content: validateContent('poem', content) }
+    })
     return {
-      content: validateContent('poem', content),
+      content: result.content,
       modelMeta: { provider: 'qwen', model: model.model, usage: result.usage, retryCount: result.retryCount }
     }
   }
@@ -243,7 +217,7 @@ ${context}` }
     ? '{"type":"review","review":{"headline":"","body":"","observations":["",""]}}'
     : '{"type":"copy","copy":{"label":"","headline":"","body":"","hashtags":["",""]}}'
   const userPrompt = draft.generateType === 'review'
-    ? `请根据以下照片理解，写一则侧重拍摄技术质量的中文图片点评。重点观察构图与主体安排、光线与明暗、色彩、清晰度和画面层次；只点评照片中确实能看出的要素，挑最值得说的两点，不必逐项套用。既指出有效的拍摄处理，也可以给出具体、温和的改进建议。
+    ? `请根据以下照片理解，写一则侧重拍摄技术质量的中文图片点评。优先使用 photoTechnique 中的具体可见观察，挑最值得说的两点，不必逐项套用；若某项为空，不要补造细节。既指出有效的拍摄处理，也可以给出具体、温和且与画面有关的改进建议。
 
 不要凭画面猜测相机、镜头、焦距、曝光参数或后期操作；不要虚构拍摄过程、人物身份或地点。标题点出这张照片最鲜明的视觉特点。正文写 40～80 个汉字，observations 填两条简短、具体的观察。
 
@@ -261,31 +235,36 @@ ${outputSchema}
 
 创作依据：
 ${context}`
-  const result = await callWithRetry(task, config, () => callChat({
-    ...config.qwen,
-    temperature: config.settings.generationTemperature,
-    maxTokens: config.settings.generationMaxTokens,
-    timeoutMs: config.settings.requestTimeoutMs,
-    messages: [
-      { role: 'system', content: SAFETY_SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt }
-    ]
-  }))
-  const content = cleanJson(result.content)
-  if (content?.safe === false) throw new Error('SAFETY_REJECTED')
+  const result = await callWithRetry(task, config.settings, async (timeoutMs, retryCount) => {
+    const response = await callChat({
+      ...config.qwen,
+      temperature: config.settings.generationTemperature,
+      maxTokens: config.settings.generationMaxTokens,
+      timeoutMs,
+      messages: [
+        { role: 'system', content: SAFETY_SYSTEM_PROMPT },
+        { role: 'user', content: `${userPrompt}${retryCount ? '\n\n前次结果格式不合要求，请按指定字段重新输出严格 JSON。' : ''}` }
+      ]
+    })
+    const content = cleanJson(response.content)
+    if (content?.safe === false) throw new Error('SAFETY_REJECTED')
+    return { ...response, content: validateContent(draft.generateType, content) }
+  })
   return {
-    content: validateContent(draft.generateType, content),
+    content: result.content,
     modelMeta: { provider: 'qwen', model: config.qwen.model, usage: result.usage, retryCount: result.retryCount }
   }
 }
 
-const findReusableUnderstanding = async (draftId, openid) => {
+const findReusableUnderstanding = async (draftId, openid, generateType) => {
   const attempts = await db.collection('creationAttempts')
     .where({ draftId, userId: openid })
     .limit(10)
     .get()
   return (attempts.data || [])
-    .filter((attempt) => attempt.photoUnderstanding && typeof attempt.photoUnderstanding === 'object')
+    .filter((attempt) => attempt.photoUnderstanding && typeof attempt.photoUnderstanding === 'object' &&
+      (generateType !== 'review' || (attempt.photoUnderstanding.photoTechnique &&
+        typeof attempt.photoUnderstanding.photoTechnique === 'object')))
     .sort((left, right) => Number(right.number || 0) - Number(left.number || 0))[0] || null
 }
 
@@ -336,7 +315,7 @@ exports.main = async (event = {}) => {
     }
     assertNotTimedOut(task)
     const config = getModelConfig()
-    const reusableAnalysis = await findReusableUnderstanding(task.draftId, openid)
+    const reusableAnalysis = await findReusableUnderstanding(task.draftId, openid, draft.generateType)
     const analysis = reusableAnalysis
       ? { understanding: reusableAnalysis.photoUnderstanding, reused: true, modelMeta: reusableAnalysis.modelMeta?.analysis || null }
       : await analyzeImage(task, asset, draft, config)

@@ -38,15 +38,23 @@ Page({
   },
 
   onUnload() {
+    this.pageVisible = false
     this.stopPolling()
     this.stopSuccessCountdown()
   },
 
   onHide() {
+    this.pageVisible = false
     this.stopPolling()
+    this.stopSuccessCountdown()
   },
 
   onShow() {
+    this.pageVisible = true
+    if (this.data.status === 'succeeded') {
+      this.startSuccessCountdown()
+      return
+    }
     if (this.data.taskId && !['failed', 'succeeded'].includes(this.data.status)) {
       this.startPolling()
       this.requestRun()
@@ -54,6 +62,7 @@ Page({
   },
 
   stopPolling() {
+    this.pollEpoch = (this.pollEpoch || 0) + 1
     if (this.pollTimer) clearInterval(this.pollTimer)
     if (this.slowTimer) clearTimeout(this.slowTimer)
     this.pollTimer = null
@@ -73,9 +82,11 @@ Page({
 
   async pollTask() {
     if (this.pollInFlight || !this.data.taskId) return
+    const pollEpoch = this.pollEpoch
     this.pollInFlight = true
     try {
       const response = await callFunctionWithTimeout('getCreation', { taskId: this.data.taskId })
+      if (this.pageVisible === false || pollEpoch !== this.pollEpoch) return
       if (!response.result?.ok) throw new Error(response.result?.message || '查询创作进度失败')
       const task = response.result.data
       const status = task.status || 'queued'
@@ -112,6 +123,7 @@ Page({
 
   async retry() {
     if (this.data.retrying) return
+    this.stopPolling()
     this.setData({ retrying: true })
     try {
       const response = await callFunctionWithTimeout('retryCreation', { taskId: this.data.taskId })

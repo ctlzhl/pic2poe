@@ -57,19 +57,115 @@ test('点击保存分享会直接打开已就绪图片的原生分享菜单', as
   }
 })
 
-test('结果页启用分享给好友和分享到朋友圈入口', () => {
+test('自己的结果页在分享凭证就绪前不开放好友和朋友圈入口', () => {
   const definition = loadPageDefinition()
   const page = createPage(definition)
+  page.loadWork = () => {}
   const originalWx = global.wx
-  let options
-  global.wx = { showShareMenu(value) { options = value } }
+  let hiddenOptions
+  let shown = false
+  global.wx = {
+    hideShareMenu(value) { hiddenOptions = value },
+    showShareMenu() { shown = true }
+  }
 
   try {
-    page.onLoad({})
-    assert.deepEqual(options, {
+    page.onLoad({ workId: 'work-1' })
+    assert.deepEqual(hiddenOptions, { menus: ['shareAppMessage', 'shareTimeline'] })
+    assert.equal(shown, false)
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})
+
+test('分享图生成成功后开放分享入口并静默预下载图片', async () => {
+  const definition = loadPageDefinition()
+  const page = createPage(definition, { workId: 'work-1' })
+  const originalWx = global.wx
+  let shownOptions
+  let downloadCount = 0
+  global.wx = {
+    cloud: {
+      callFunction({ success }) {
+        success({ result: { ok: true, data: {
+          shareToken: 'share-token',
+          shareImageUrl: 'https://example.com/share-card.jpg',
+          shareTitle: '照片有话说'
+        } } })
+      }
+    },
+    showShareMenu(value) { shownOptions = value },
+    downloadFile({ success }) {
+      downloadCount += 1
+      success({ statusCode: 200, tempFilePath: '/tmp/share-card.jpg' })
+    }
+  }
+
+  try {
+    await page.prepareShareCard()
+    await page.getShareImageTempPath()
+    assert.deepEqual(shownOptions, {
       withShareTicket: true,
       menus: ['shareAppMessage', 'shareTimeline']
     })
+    assert.equal(downloadCount, 1)
+    assert.equal(page.shareImageTempPath, '/tmp/share-card.jpg')
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})
+
+test('预下载未完成时重复读取只发起一次下载', async () => {
+  const definition = loadPageDefinition()
+  const page = createPage(definition, { shareImageUrl: 'https://example.com/share-card.jpg' })
+  const originalWx = global.wx
+  let completeDownload
+  let downloadCount = 0
+  global.wx = {
+    downloadFile({ success }) {
+      downloadCount += 1
+      completeDownload = () => success({ statusCode: 200, tempFilePath: '/tmp/share-card.jpg' })
+    }
+  }
+
+  try {
+    const first = page.getShareImageTempPath()
+    const second = page.getShareImageTempPath()
+    assert.equal(downloadCount, 1)
+    completeDownload()
+    assert.equal(await first, '/tmp/share-card.jpg')
+    assert.equal(await second, '/tmp/share-card.jpg')
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})
+
+test('连续点击保存分享只打开一次原生菜单', async () => {
+  const definition = loadPageDefinition()
+  const page = createPage(definition, { shareImageUrl: 'https://example.com/share-card.jpg' })
+  page.shareImageTempPath = '/tmp/share-card.jpg'
+  const originalWx = global.wx
+  let completeMenu
+  let menuCount = 0
+  global.wx = {
+    showLoading() {},
+    hideLoading() {},
+    showShareImageMenu({ success }) {
+      menuCount += 1
+      completeMenu = success
+    }
+  }
+
+  try {
+    const first = page.openNativeShareMenu()
+    const second = page.openNativeShareMenu()
+    await Promise.resolve()
+    assert.equal(menuCount, 1)
+    completeMenu()
+    await Promise.all([first, second])
   } finally {
     if (originalWx === undefined) delete global.wx
     else global.wx = originalWx

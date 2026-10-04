@@ -70,3 +70,61 @@ test('创作成功后在三秒内自动进入结果页', () => {
     global.clearTimeout = originalClearTimeout
   }
 })
+
+test('成功页隐藏期间不跳转，重新显示后再倒计时', () => {
+  const page = createPage(loadPageDefinition(), {
+    taskId: 'task-1', workId: 'work-1', status: 'succeeded'
+  })
+  let redirects = 0
+  page.goResult = () => { redirects += 1 }
+  const originalSetTimeout = global.setTimeout
+  const originalClearTimeout = global.clearTimeout
+  const scheduled = new Map()
+  let nextId = 0
+  global.setTimeout = (callback) => {
+    const id = ++nextId
+    scheduled.set(id, callback)
+    return id
+  }
+  global.clearTimeout = (id) => scheduled.delete(id)
+  const tick = () => {
+    const [id, callback] = scheduled.entries().next().value
+    scheduled.delete(id)
+    callback()
+  }
+
+  try {
+    page.startSuccessCountdown()
+    page.onHide()
+    assert.equal(scheduled.size, 0)
+    assert.equal(redirects, 0)
+    page.onShow()
+    tick()
+    tick()
+    tick()
+    assert.equal(redirects, 1)
+  } finally {
+    global.setTimeout = originalSetTimeout
+    global.clearTimeout = originalClearTimeout
+  }
+})
+
+test('页面隐藏后不接收之前发出的轮询结果', async () => {
+  const helper = require('../../utils/requestHelper')
+  const originalCall = helper.callFunctionWithTimeout
+  let completeRequest
+  helper.callFunctionWithTimeout = () => new Promise((resolve) => { completeRequest = resolve })
+  let definition
+  try {
+    definition = loadPageDefinition()
+  } finally {
+    helper.callFunctionWithTimeout = originalCall
+  }
+  const page = createPage(definition, { taskId: 'task-1' })
+  const pending = page.pollTask()
+  page.onHide()
+  completeRequest({ result: { ok: true, data: { status: 'succeeded', workId: 'work-1' } } })
+  await pending
+  assert.equal(page.data.status, 'queued')
+  assert.equal(page.data.workId, '')
+})

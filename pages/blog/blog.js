@@ -69,6 +69,12 @@ Page({
     this.setData({ posts: [], page: 0, hasMore: true, loading: false })
     this.loadMore({ force: true, requestVersion })
   },
+  onCoverError(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    if (Number.isInteger(index) && index >= 0 && this.data.posts[index]?.featuredImage) {
+      this.setData({ [`posts[${index}].featuredImage`]: '' })
+    }
+  },
   openPost(event) { const postId = event.currentTarget.dataset.postId; if (postId) wx.navigateTo({ url: `/pages/blog-detail/blog-detail?postId=${postId}` }) },
 
   onShareAppMessage() {

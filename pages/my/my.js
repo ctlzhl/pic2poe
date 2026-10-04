@@ -3,6 +3,7 @@ const { showErrorToast } = require('../../utils/errorHandler')
 const { formatDotDate } = require('../../utils/date')
 
 const TYPE_TITLE = { poem: '五言绝句', review: '图片点评', copy: '配图文案' }
+const PROFILE_REFRESH_INTERVAL_MS = 30 * 60 * 1000
 
 Page({
   data: {
@@ -19,24 +20,34 @@ Page({
   },
 
   onShow() {
-    this.loadProfile()
+    if (this.profileLoadPromise) return this.profileLoadPromise
+    if (!this.profileResolved || Date.now() - this.profileConfirmedAt >= PROFILE_REFRESH_INTERVAL_MS) return this.loadProfile()
+    return this.data.authorized ? this.loadRecentWorks() : undefined
   },
 
-  async loadProfile() {
-    this.setData({ profileLoading: true })
-    try {
-      const response = await callFunctionWithTimeout('userProfile', { action: 'get' })
-      if (!response.result?.ok) throw new Error(response.result?.message || '登录状态确认失败，请稍后再试。')
-      const { authorized, profile } = response.result.data || {}
-      this.setData({ authorized: Boolean(authorized), profile: profile || {} })
-      if (authorized) await this.loadRecentWorks()
-    } catch (error) {
-      console.error('读取用户资料失败:', error)
-      this.setData({ authorized: false })
-      showErrorToast(error, '登录状态确认失败，请稍后再试。')
-    } finally {
-      this.setData({ profileLoading: false })
-    }
+  loadProfile() {
+    if (this.profileLoadPromise) return this.profileLoadPromise
+    const needsInitialLoading = !this.profileResolved
+    if (needsInitialLoading) this.setData({ profileLoading: true })
+    this.profileLoadPromise = (async () => {
+      try {
+        const response = await callFunctionWithTimeout('userProfile', { action: 'get' })
+        if (!response.result?.ok) throw new Error(response.result?.message || '登录状态确认失败，请稍后再试。')
+        const { authorized, profile } = response.result.data || {}
+        this.setData({ authorized: Boolean(authorized), profile: profile || {} })
+        this.profileResolved = true
+        this.profileConfirmedAt = Date.now()
+        if (authorized) await this.loadRecentWorks()
+      } catch (error) {
+        console.error('读取用户资料失败:', error)
+        if (!this.profileResolved) this.setData({ authorized: false })
+        showErrorToast(error, '登录状态确认失败，请稍后再试。')
+      } finally {
+        if (needsInitialLoading) this.setData({ profileLoading: false })
+        this.profileLoadPromise = null
+      }
+    })()
+    return this.profileLoadPromise
   },
 
   onNicknameInput(event) {
@@ -89,6 +100,8 @@ Page({
           const response = await callFunctionWithTimeout('userProfile', { action: 'save', profile: profileChanges })
           if (!response.result?.ok) throw new Error(response.result?.message || '登录资料保存失败，请稍后再试。')
           authorized = Boolean(response.result.data?.authorized)
+          this.profileResolved = true
+          this.profileConfirmedAt = Date.now()
           this.setData({
             authorized,
             profile: { ...(response.result.data?.profile || {}), ...this.pendingProfileChanges }

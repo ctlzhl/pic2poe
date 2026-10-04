@@ -21,7 +21,7 @@ docs/               部署、云端配置与验收说明
 cloudbaserc.json    云函数部署清单与运行时配置
 ```
 
-主要页面为：首页、随便看看、文章详情、创作、创作中、结果、我的作品、设置与隐私说明。
+主要页面为：首页、随便看看、文章详情、创作、创作中、结果、我的、我的作品、设置与隐私说明。
 
 ## 本地打开
 
@@ -35,7 +35,7 @@ cloudbaserc.json    云函数部署清单与运行时配置
 
 完整的集合、索引、权限、环境变量、Sharp 打包和验收步骤见：[P1 云端配置与验收](docs/P1-云端配置与验收.md)。
 
-本轮更新以下云函数后，再重新编译小程序：
+按实际改动范围部署对应云函数，再重新编译小程序。完整部署清单、Sharp 依赖与定时触发器见上面的验收文档；不要把下列示例当作线上已更新的证明。
 
 ```bash
 tcb fn deploy prepareImage -r ap-shanghai
@@ -45,6 +45,8 @@ tcb fn deploy deleteWork -r ap-shanghai
 tcb fn deploy listWorks -r ap-shanghai
 tcb fn deploy getBlogPosts -r ap-shanghai
 tcb fn deploy userProfile -r ap-shanghai
+tcb fn deploy createShareCard -r ap-shanghai
+tcb fn deploy getSharedWork -r ap-shanghai
 ```
 
 `prepareImage` 使用 Linux x64 的 Sharp 依赖，部署前请按云端配置文档安装对应平台依赖。其余函数由 CloudBase 在云端安装依赖。

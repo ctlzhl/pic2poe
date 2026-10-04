@@ -1,7 +1,7 @@
 const QWEN_GENERATION_MODEL = 'qwen3.7-flash-2026-07-15'
 
 const DEFAULT_MODEL_CONFIG = {
-  promptVersion: 'p1-20260927',
+  promptVersion: 'p2-20261005',
   requestTimeoutMs: 18000,
   maxRetries: 1,
   visionTemperature: 0.2,
@@ -36,4 +36,19 @@ const getModelConfig = (environment = process.env) => ({
 
 const poemGenerationModel = (config) => config.qwen
 
-module.exports = { QWEN_GENERATION_MODEL, getModelConfig, poemGenerationModel }
+const buildVisionInstruction = (draft = {}) => {
+  const schema = draft.generateType === 'review'
+    ? '{"scene":"","subjects":[],"actions":[],"emotion":"","visualFocus":[],"photoTechnique":{"composition":"","lighting":"","color":"","clarity":"","depth":""}}'
+    : '{"scene":"","subjects":[],"actions":[],"emotion":"","visualFocus":[]}'
+  return [
+    '只描述图片中可见内容，不推断身份、地点、敏感属性或不存在的故事。',
+    `仅返回 JSON：${schema}。`,
+    draft.generateType === 'review'
+      ? 'photoTechnique 只记录画面可见的拍摄技术观察：构图和主体安排、光线与明暗、色彩、清晰度及画面层次。每项用一句具体描述；不能判断的项目填空字符串，不猜相机、镜头、曝光参数或后期操作。'
+      : '',
+    draft.location ? `用户填写地点：${draft.location}` : '',
+    draft.moment ? `用户补充：${draft.moment}` : ''
+  ].filter(Boolean).join('\n')
+}
+
+module.exports = { QWEN_GENERATION_MODEL, getModelConfig, poemGenerationModel, buildVisionInstruction }

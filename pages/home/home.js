@@ -1,7 +1,8 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { formatDotDate } = require('../../utils/date')
-const HOME_POSTS_CACHE_KEY = 'homeLatestPosts:v1'
-const HOME_POSTS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const HOME_POSTS_CACHE_KEY = 'homeLatestPosts:v3'
+// 云存储临时图片链接会过期，首页本地快照只用于短时间内的即时展示。
+const HOME_POSTS_CACHE_MAX_AGE_MS = 30 * 60 * 1000
 
 Page({
   data: { posts: [], blogLoading: true, blogError: '' },
@@ -50,6 +51,13 @@ Page({
 
   openBlogList() {
     wx.navigateTo({ url: '/pages/blog/blog' })
+  },
+
+  onCoverError(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    if (Number.isInteger(index) && index >= 0 && this.data.posts[index]?.featuredImage) {
+      this.setData({ [`posts[${index}].featuredImage`]: '' })
+    }
   },
 
   openPost(event) {

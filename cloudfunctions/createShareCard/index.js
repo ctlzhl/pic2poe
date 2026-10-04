@@ -319,11 +319,22 @@ const ensureCheckedBeforeSharing = async (work, asset, openid) => {
   }
 }
 
+const checkRenderedCard = async (card) => {
+  // 成品图包含原图、文字和二维码；发布前审核最终可见内容。
+  const reviewImage = await sharp(card)
+    .resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 75 })
+    .toBuffer()
+  await checkImage(cloud, reviewImage)
+}
+
 exports.main = async (event = {}) => {
   const openid = cloud.getWXContext().OPENID
   const workId = typeof event.workId === 'string' ? event.workId : ''
   let uploadedFileId = ''
   let sharePersisted = false
+  let cardHash = ''
+  let shareCardId = ''
   if (!openid) return fail('UNAUTHORIZED', '请先登录后再分享作品。')
   if (!workId) return fail('INVALID_WORK', '作品不存在或已失效。')
 
@@ -344,11 +355,14 @@ exports.main = async (event = {}) => {
     await ensureCheckedBeforeSharing(work, asset, openid)
     const shareWork = { ...work, content: redactShareContent(work.content, draft?.location) }
     const hash = contentHash(shareWork)
+    cardHash = hash
     const reusable = await existingCard(workId, openid, hash)
     if (reusable?.fileId) {
       if (!canReuseShareCard(reusable)) {
+        const oldCard = (await cloud.downloadFile({ fileID: reusable.fileId })).fileContent
+        await checkRenderedCard(oldCard)
         await db.collection('shareCards').doc(reusable._id).update({
-          data: { safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() }, updatedAt: db.serverDate() }
+          data: { safety: { status: 'passed', cardChecked: true, provider: 'wechat', checkedAt: db.serverDate() }, updatedAt: db.serverDate() }
         })
       }
       const shareImageUrl = await getTempUrl(reusable.fileId)
@@ -367,10 +381,13 @@ exports.main = async (event = {}) => {
     const card = shareWork.type === 'poem'
       ? await renderPoemCard(shareWork, source, metadata, qr)
       : await renderEditorialCard(shareWork, source, qr, metadata)
-    const cardPath = `users/${openid}/share/${workId}/${TEMPLATE_VERSION}-${hash.slice(0, 16)}.jpg`
+    await checkRenderedCard(card)
+    const cardPath = `users/${openid}/share/${workId}/${TEMPLATE_VERSION}-${hash.slice(0, 16)}-${shareToken}.jpg`
     const upload = await cloud.uploadFile({ cloudPath: cardPath, fileContent: card })
     uploadedFileId = upload.fileID
     const shareTitle = getShareTitle(shareWork)
+    // 文件失效后的下一代快照以旧凭证参与定址，并发重建仍写入同一记录。
+    shareCardId = crypto.createHash('sha256').update(`${openid}\n${workId}\n${hash}\n${reusable?.shareToken || ''}`).digest('hex')
 
     await db.runTransaction(async (transaction) => {
       // 删除作品与生成分享图可能并发发生。提交公开快照前再次确认作品和图片
@@ -388,6 +405,7 @@ exports.main = async (event = {}) => {
       }
       await transaction.collection('shareCards').add({
         data: {
+          _id: shareCardId,
           workId,
           userId: openid,
           shareToken,
@@ -399,7 +417,7 @@ exports.main = async (event = {}) => {
           contentHash: hash,
           fileId: upload.fileID,
           shareTitle,
-          safety: { status: 'passed', provider: 'wechat', checkedAt: db.serverDate() },
+          safety: { status: 'passed', cardChecked: true, provider: 'wechat', checkedAt: db.serverDate() },
           status: 'ready',
           createdAt: db.serverDate(),
           updatedAt: db.serverDate()
@@ -412,6 +430,25 @@ exports.main = async (event = {}) => {
     if (!shareImageUrl) throw new Error('SHARE_FILE_UNAVAILABLE')
     return { ok: true, data: { shareToken, shareImageUrl, shareTitle } }
   } catch (error) {
+    if (uploadedFileId && !sharePersisted && cardHash && shareCardId && error?.message !== 'WORK_NOT_FOUND') {
+      try {
+        const winner = (await db.collection('shareCards').doc(shareCardId).get()).data
+        if (winner?.workId === workId && winner.userId === openid && winner.contentHash === cardHash &&
+          winner.status === 'ready' && canReuseShareCard(winner)) {
+          const shareImageUrl = await getTempUrl(winner.fileId)
+          if (shareImageUrl) {
+            try {
+              await cloud.deleteFile({ fileList: [uploadedFileId] })
+            } catch (cleanupError) {
+              console.warn('回收重复分享图失败:', cleanupError?.message || cleanupError)
+            }
+            return { ok: true, data: { shareToken: winner.shareToken, shareImageUrl, shareTitle: winner.shareTitle } }
+          }
+        }
+      } catch (lookupError) {
+        console.warn('读取并发分享图结果失败:', lookupError?.message || lookupError)
+      }
+    }
     // 上传与快照写入并非同一个原子操作。只有尚未写入快照时才补偿删除，
     // 避免因为临时 URL 获取失败而误删一个已经可被复用的分享成品图。
     if (uploadedFileId && !sharePersisted) {

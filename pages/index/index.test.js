@@ -131,6 +131,7 @@ test('创建上传任务与本地压缩同时进行，避免两段耗时相加',
   const previousWx = global.wx
   let finishCompression
   let ticketStarted = false
+  let originalUploadStarted = false
   global.wx = {
     chooseMedia: async () => ({ tempFiles: [{ tempFilePath: '/tmp/original.jpg', size: 4886339 }] }),
     getImageInfo({ src, success }) {
@@ -148,7 +149,10 @@ test('创建上传任务与本地压缩同时进行，避免两段耗时相加',
         }
         success({ result: { ok: true, data: {} } })
       },
-      uploadFile({ cloudPath, success }) { success({ fileID: `cloud://${cloudPath}` }) }
+      uploadFile({ cloudPath, success }) {
+        if (cloudPath === 'staging/original.jpg') originalUploadStarted = true
+        success({ fileID: `cloud://${cloudPath}` })
+      }
     }
   }
   try {
@@ -156,6 +160,8 @@ test('创建上传任务与本地压缩同时进行，避免两段耗时相加',
     const pending = page.chooseImage()
     while (!finishCompression) await Promise.resolve()
     assert.equal(ticketStarted, true)
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(originalUploadStarted, true)
     finishCompression()
     await pending
     assert.equal(page.data.prepareState, 'ready')
@@ -261,7 +267,7 @@ test('原图上传失败时回收已经上传的工作图', async () => {
     cloud: {
       callFunction({ success }) { success({ result: { ok: true, data: { assetId: 'asset', stagingPath: 'staging/original.jpg', workingStagingPath: 'staging/working.jpg' } } }) },
       uploadFile({ cloudPath, success, fail }) {
-        if (cloudPath.includes('original')) fail(new Error('upload failed'))
+        if (cloudPath.includes('original')) fail({ errMsg: 'uploadFile:fail cancel' })
         else success({ fileID: 'cloud://staging/working.jpg' })
       },
       deleteFile: async ({ fileList }) => { deleted.push(...fileList) }
@@ -513,6 +519,52 @@ test('离开创作页后，仍在上传的旧图片不能回写到新首屏', as
     assert.equal(page.data.prepareState, 'idle')
     assert.deepEqual(deleted, ['cloud://staging.jpg'])
   } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})
+
+test('离页时本地压缩未结束，已启动的原图上传仍会被回收', async () => {
+  const definition = loadPageDefinition()
+  const previousWx = global.wx
+  let finishCompression
+  let choosing
+  let timeout
+  const deleted = []
+  global.wx = {
+    chooseMedia: async () => ({ tempFiles: [{ tempFilePath: '/tmp/original.jpg', size: 4886339 }] }),
+    getImageInfo({ src, success }) {
+      success(src === '/tmp/original.jpg'
+        ? { width: 5712, height: 4284, orientation: 'right', type: 'jpeg' }
+        : { width: 1536, height: 2048, orientation: 'up', type: 'jpeg' })
+    },
+    compressImage({ success }) { finishCompression = () => success({ tempFilePath: '/tmp/working.jpg' }) },
+    getFileInfo({ success }) { success({ size: 700000 }) },
+    cloud: {
+      callFunction({ name, success }) {
+        if (name === 'createImageUpload') return success({ result: { ok: true, data: { assetId: 'asset', stagingPath: 'staging/original.jpg', workingStagingPath: 'staging/working.jpg' } } })
+        throw new Error('离页后不应处理图片')
+      },
+      uploadFile({ cloudPath, success }) { success({ fileID: `cloud://${cloudPath}` }) },
+      deleteFile: async ({ fileList }) => { deleted.push(...fileList) }
+    }
+  }
+  try {
+    const page = createPage(definition, {})
+    choosing = page.chooseImage()
+    while (!finishCompression) await Promise.resolve()
+    await new Promise((resolve) => setImmediate(resolve))
+    page.onHide()
+    await Promise.race([
+      choosing,
+      new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('离页后等待本地压缩，原图未回收')), 1000) })
+    ])
+    assert.deepEqual(deleted, ['cloud://staging/original.jpg'])
+    assert.equal(page.data.prepareState, 'idle')
+  } finally {
+    clearTimeout(timeout)
+    finishCompression?.()
+    if (choosing) await choosing
     if (previousWx === undefined) delete global.wx
     else global.wx = previousWx
   }

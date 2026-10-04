@@ -17,14 +17,14 @@
       "type": "Event",
       "handler": "index.main",
       "runtime": "Nodejs20.19",
-      "timeout": 15,
+      "timeout": 120,
       "memorySize": 256,
       "installDependency": true,
       "triggers": [
         {
-          "name": "refresh-home-blog-every-5-minutes",
+          "name": "refresh-blog-daily",
           "type": "timer",
-          "config": "0 */5 * * * * *"
+          "config": "0 0 3 * * * *"
         }
       ]
     },

@@ -33,15 +33,15 @@ Page({
   },
 
   onLoad(options) {
-    wx.showShareMenu({
-      withShareTicket: true,
-      menus: ['shareAppMessage', 'shareTimeline']
-    })
-
     const shareToken = parseShareToken(options)
     if (shareToken) {
+      this.enableShareMenu()
       this.loadSharedWork(shareToken)
       return
+    }
+
+    if (typeof wx.hideShareMenu === 'function') {
+      wx.hideShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] })
     }
 
     const workId = options.workId || ''
@@ -50,6 +50,13 @@ Page({
       return
     }
     this.loadWork(workId)
+  },
+
+  enableShareMenu() {
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    })
   },
 
   async loadWork(workId) {
@@ -106,12 +113,19 @@ Page({
           throw new Error(response.result?.message || '分享图生成失败')
         }
         const share = response.result.data
+        if (!share?.shareToken || !share?.shareImageUrl) throw new Error('分享图生成结果不完整，请重试。')
         this.setData({
           shareToken: share.shareToken,
           shareImageUrl: share.shareImageUrl,
           shareTitle: share.shareTitle || '照片有话说'
         })
         this.shareImageTempPath = ''
+        if (share.shareToken) this.enableShareMenu()
+        if (share.shareImageUrl && typeof wx.downloadFile === 'function') {
+          this.getShareImageTempPath().catch((error) => {
+            console.warn('分享图预下载失败，将在用户点击时重试:', error)
+          })
+        }
         return share.shareImageUrl
       } catch (error) {
         console.error('生成分享图失败:', error)
@@ -132,17 +146,37 @@ Page({
 
   async getShareImageTempPath() {
     if (this.shareImageTempPath) return this.shareImageTempPath
+    if (this.shareImageDownloadPromise) return this.shareImageDownloadPromise
     if (!this.data.shareImageUrl) throw new Error('分享图正在生成，请稍候')
 
-    const download = await downloadFileWithTimeout(this.data.shareImageUrl)
-    if (download.statusCode && (download.statusCode < 200 || download.statusCode >= 300)) {
-      throw new Error('分享图下载失败')
+    const task = (async () => {
+      const download = await downloadFileWithTimeout(this.data.shareImageUrl)
+      if (!download.tempFilePath || (download.statusCode && (download.statusCode < 200 || download.statusCode >= 300))) {
+        throw new Error('分享图下载失败')
+      }
+      this.shareImageTempPath = download.tempFilePath
+      return this.shareImageTempPath
+    })()
+    this.shareImageDownloadPromise = task
+    try {
+      return await task
+    } finally {
+      if (this.shareImageDownloadPromise === task) this.shareImageDownloadPromise = null
     }
-    this.shareImageTempPath = download.tempFilePath
-    return this.shareImageTempPath
   },
 
   async openNativeShareMenu() {
+    if (this.openingShareMenu) return this.openingShareMenu
+    const task = this.showNativeShareMenu()
+    this.openingShareMenu = task
+    try {
+      return await task
+    } finally {
+      if (this.openingShareMenu === task) this.openingShareMenu = null
+    }
+  },
+
+  async showNativeShareMenu() {
     wx.showLoading({ title: '正在打开…', mask: true })
     try {
       if (!this.data.shareImageUrl) {

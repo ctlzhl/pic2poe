@@ -29,3 +29,16 @@ test('遗留模型环境变量不能覆盖固定的 Qwen 快照', () => {
 
   assert.equal(config.qwen.model, 'qwen3.7-flash-2026-07-15')
 })
+
+test('图片点评的识图阶段要求可见的拍摄技术观察，其他类型不增加负担', () => {
+  const { buildVisionInstruction } = loadCore()
+  const review = buildVisionInstruction({ generateType: 'review', location: '公园', moment: '黄昏散步' })
+  const poem = buildVisionInstruction({ generateType: 'poem' })
+
+  assert.match(review, /photoTechnique/)
+  assert.match(review, /构图/)
+  assert.match(review, /不能判断/)
+  assert.match(review, /用户填写地点：公园/)
+  assert.match(review, /用户补充：黄昏散步/)
+  assert.doesNotMatch(poem, /photoTechnique/)
+})

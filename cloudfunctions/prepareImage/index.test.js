@@ -37,6 +37,9 @@ const loadHandler = (asset, controls) => {
     deleteFile: async ({ fileList }) => { deleted.push(...fileList) },
     openapi: { security: { imgSecCheck: async ({ media }) => {
       checkedImages.push(media.value)
+      controls.onCheck?.(media.value)
+      if (media.value === WORKING && controls.workingCheckReady) await controls.workingCheckReady
+      if (media.value === ORIGINAL && controls.originalCheckReady) await controls.originalCheckReady
       return media.value === ORIGINAL && controls.rejectOriginal ? { errCode: 87014 } : { errCode: 0 }
     } } }
   }
@@ -124,6 +127,46 @@ test('原图内容安全检查未通过时，不能把工作图标记为安全�
   assert.equal(response.ok, false)
   assert.equal(response.code, 'CONTENT_REJECTED')
   assert.equal(handler.updates.some((update) => update.status === 'ready'), false)
+})
+
+test('工作图与原图安全检查并行发起，且两项完成前不写入安全资产', async () => {
+  let releaseWorking
+  let releaseOriginal
+  let bothStarted
+  const workingCheckReady = new Promise((resolve) => { releaseWorking = resolve })
+  const originalCheckReady = new Promise((resolve) => { releaseOriginal = resolve })
+  const bothChecksStarted = new Promise((resolve) => { bothStarted = resolve })
+  const seen = new Set()
+  const asset = {
+    userId: 'u', status: 'uploading',
+    stagingPath: 'staging/u/original.jpg',
+    workingStagingPath: 'staging/u/working.jpg'
+  }
+  const handler = loadHandler(asset, {
+    originalReady: Promise.resolve(),
+    workingCheckReady,
+    originalCheckReady,
+    onCheck: (buffer) => { seen.add(buffer); if (seen.size === 2) bothStarted() }
+  })
+  const pending = handler.main({
+    assetId: 'asset',
+    fileID: 'cloud://env/staging/u/original.jpg',
+    workingFileID: 'cloud://env/staging/u/working.jpg'
+  })
+  let timeout
+  try {
+    await Promise.race([
+      bothChecksStarted,
+      new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('两项安全检查未并行发起')), 1000) })
+    ])
+    assert.equal(handler.updates.some((update) => update.status === 'ready'), false)
+  } finally {
+    clearTimeout(timeout)
+    releaseWorking()
+    releaseOriginal()
+    await pending
+  }
+  assert.equal(handler.updates.at(-1).status, 'ready')
 })
 
 test('云函数拒绝非上传任务签发的工作图路径', async () => {

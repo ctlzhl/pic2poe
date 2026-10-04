@@ -18,5 +18,5 @@ page { background: #f8f7f2; }
 .blog-state { padding: 52rpx 20rpx; color: #7c8578; font-size: 27rpx; text-align: center; }.retry-link { margin-top: 18rpx; }
 .post-list { display: flex; flex-direction: column; gap: 22rpx; }
 .post-card { display: flex; overflow: hidden; border-radius: 22rpx; background: #fff; box-shadow: 0 8rpx 22rpx rgba(50, 60, 47, .06); }
-.post-cover { width: 204rpx; height: 204rpx; flex: 0 0 204rpx; background: #e2e7de; }.placeholder { background: linear-gradient(145deg, #dbe4d4, #f1ecdf); }
+.post-cover { width: 204rpx; height: 204rpx; flex: 0 0 204rpx; background: #e2e7de; }.placeholder { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8rpx; background: linear-gradient(145deg, #dbe4d4, #f1ecdf); color: #70836f; }.placeholder-mark { font-size: 38rpx; line-height: 1; }.placeholder-label { font-size: 22rpx; letter-spacing: 3rpx; }
 .post-body { min-width: 0; padding: 22rpx 22rpx 18rpx; }.post-meta { color: #869080; font-size: 20rpx; }.post-title { margin-top: 9rpx; overflow: hidden; font-size: 29rpx; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.post-excerpt { display: -webkit-box; margin-top: 10rpx; overflow: hidden; color: #737b70; font-size: 23rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

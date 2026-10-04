@@ -17,6 +17,7 @@ test('normalizePost 清洗 WordPress HTML 并提取文章展示字段', () => {
   const post = normalizePost({
     id: 12,
     date: '2026-09-14T09:30:00',
+    modified: '2026-09-15T10:00:00',
     title: { rendered: '<em>秋日</em>&amp;光' },
     excerpt: { rendered: '<p>一段 <strong>被保留</strong> 的摘要。</p><script>alert(1)</script>' },
     content: { rendered: '<h2>标题</h2><p>正文 <a href="javascript:alert(1)">链接</a></p><iframe src="bad"></iframe>' },
@@ -40,7 +41,9 @@ test('normalizePost 清洗 WordPress HTML 并提取文章展示字段', () => {
     contentHtml: '<h2>标题</h2><p>正文 <a>链接</a></p>',
     featuredImage: 'https://cdn.example.com/post-768.jpg',
     categoryName: '旅行',
-    publishedAt: '2026-09-14T09:30:00'
+    categoryIds: [],
+    publishedAt: '2026-09-14T09:30:00',
+    modifiedAt: '2026-09-15T10:00:00'
   })
 })
 
@@ -53,6 +56,21 @@ test('normalizePost 没有合适的缩略图时保留特色图原地址', () => 
   }, { includeContent: false })
 
   assert.equal(post.featuredImage, 'https://cdn.example.com/post-original.jpg')
+})
+
+test('列表文章没有特色图时使用正文首张安全图片并保留分类 ID', () => {
+  const { normalizePost } = loadCore()
+  const post = normalizePost({
+    id: 14,
+    title: { rendered: '正文配图' },
+    content: { rendered: '<p>开头</p><img src="https://shengxiluo.me/uploads/cover.jpg"><img src="https://shengxiluo.me/uploads/other.jpg">' },
+    categories: [7, 343],
+    _embedded: { 'wp:term': [[{ id: 7, name: '摄影' }]] }
+  }, { includeContent: false })
+
+  assert.equal(post.featuredImage, 'https://shengxiluo.me/uploads/cover.jpg')
+  assert.deepEqual(post.categoryIds, [7, 343])
+  assert.equal(post.contentHtml, '')
 })
 
 test('sanitizeContentHtml 让正文图片按容器宽度等比例展示', () => {

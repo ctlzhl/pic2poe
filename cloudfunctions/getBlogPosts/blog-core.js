@@ -75,14 +75,26 @@ const getCategoryName = (embedded = {}) => {
   return String(terms[0]?.name || '').trim()
 }
 
-const getFeaturedImage = (media = {}) => {
+const getFeaturedImage = (media = {}, preferSmallImage = false) => {
   const sizes = media?.media_details?.sizes || {}
-  const preferredSizes = ['medium_large', 'large', 'medium']
+  const preferredSizes = preferSmallImage
+    ? ['medium', 'medium_large', 'thumbnail', 'large']
+    : ['medium_large', 'large', 'medium']
   for (const size of preferredSizes) {
     const url = safeUrl(sizes?.[size]?.source_url)
     if (url) return url
   }
   return safeUrl(media?.source_url || '')
+}
+
+const firstContentImage = (content = '') => {
+  const images = String(content).match(/<img\b[^>]*>/gi) || []
+  for (const image of images) {
+    const source = (image.match(/\b(?:src|data-src)\s*=\s*["']([^"']+)["']/i) || [])[1]
+    const url = safeUrl(source)
+    if (url) return url
+  }
+  return ''
 }
 
 const normalizeCategories = (categories = []) => (Array.isArray(categories) ? categories : [])
@@ -92,7 +104,7 @@ const normalizeCategories = (categories = []) => (Array.isArray(categories) ? ca
   }))
   .filter((category) => category.id > 0 && category.name && !HIDDEN_CATEGORY_IDS.includes(category.id) && !HIDDEN_CATEGORY_NAMES.has(category.name))
 
-const normalizePost = (post = {}, { includeContent = true } = {}) => {
+const normalizePost = (post = {}, { includeContent = true, preferSmallImage = false } = {}) => {
   const embedded = post._embedded || {}
   const media = Array.isArray(embedded['wp:featuredmedia']) ? embedded['wp:featuredmedia'][0] : null
   const contentHtml = includeContent ? sanitizeContentHtml(post.content?.rendered || '') : ''
@@ -104,9 +116,11 @@ const normalizePost = (post = {}, { includeContent = true } = {}) => {
     excerpt,
     contentHtml,
     // 列表与详情都优先使用适合移动端的 WordPress 衍生图，避免拉取原始大图。
-    featuredImage: getFeaturedImage(media),
+    featuredImage: getFeaturedImage(media, preferSmallImage) || firstContentImage(post.content?.rendered),
     categoryName: getCategoryName(embedded),
-    publishedAt: String(post.date || '')
+    categoryIds: (Array.isArray(post.categories) ? post.categories : []).map(Number).filter((id) => Number.isInteger(id) && id > 0),
+    publishedAt: String(post.date || ''),
+    modifiedAt: String(post.modified || '')
   }
 }
 

@@ -16,5 +16,6 @@ test('公开分享只返回已通过微信内容检测的快照', () => {
   const share = { creationFileId: 'cloud://photo', content: { type: 'poem' }, type: 'poem' }
   assert.equal(canReadPublicShare(share), false)
   assert.equal(canReadPublicShare({ ...share, safety: { status: 'rejected' } }), false)
-  assert.equal(canReadPublicShare({ ...share, safety: { status: 'passed' } }), true)
+  assert.equal(canReadPublicShare({ ...share, safety: { status: 'passed' } }), false)
+  assert.equal(canReadPublicShare({ ...share, safety: { status: 'passed', cardChecked: true } }), true)
 })

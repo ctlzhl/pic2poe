@@ -96,7 +96,7 @@ const buildDerivedImages = async (input) => {
       fit: 'inside',
       withoutEnlargement: true
     })
-    .jpeg({ quality: 86, mozjpeg: true })
+    .jpeg({ quality: 86 })
     .toBuffer()
 
   // 缩略图从已生成的创作图继续缩放，避免再次解码高像素原图。
@@ -221,9 +221,16 @@ exports.main = async (event = {}) => {
   const inputBytes = input.length
 
   try {
-    await checkImage(cloud, derived.thumbnailBuffer)
+    const checks = [checkImage(cloud, derived.thumbnailBuffer)]
     // 工作图与原图来自两次独立上传，不能仅凭尺寸比例认定内容一致。
-    if (workingFileID) await checkImage(cloud, await buildSafetyThumbnail(input))
+    if (workingFileID) {
+      checks.push(buildSafetyThumbnail(input).then((thumbnail) => checkImage(cloud, thumbnail)))
+    }
+    const results = await Promise.allSettled(checks)
+    const rejected = results.find((result) => result.status === 'rejected' && result.reason?.message === 'CONTENT_REJECTED')
+    if (rejected) throw rejected.reason
+    const failed = results.find((result) => result.status === 'rejected')
+    if (failed) throw failed.reason
     finishStage('securityMs')
   } catch (error) {
     const rejected = error?.message === 'CONTENT_REJECTED'
