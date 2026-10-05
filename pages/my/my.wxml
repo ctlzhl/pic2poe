@@ -20,7 +20,7 @@
 
     <block wx:elif="{{loading}}"><view class="state">正在整理作品…</view></block>
     <block wx:elif="{{errorMessage}}"><view class="state"><view>{{errorMessage}}</view><button class="text-button" bindtap="loadRecentWorks">重新加载</button></view></block>
-    <block wx:elif="{{!works.length}}"><view class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="primary-button" bindtap="startCreation">开始创作</button></view></block>
+    <block wx:elif="{{!works.length}}"><view class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="ui-button ui-button-primary" bindtap="startCreation">开始创作</button></view></block>
     <block wx:else>
       <view class="section-head"><view>我的作品（{{totalWorks}}）</view><view class="all-link" bindtap="openAllWorks">查看全部</view></view>
       <view class="grid">

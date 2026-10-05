@@ -50,12 +50,14 @@ test('EXIF 旋转后的可见宽高用于判断版式和计算照片比例', () 
   assert.equal(editorialLayoutFor({ width: 1600, height: 900, orientation: 6 }).kind, 'side-by-side')
 })
 
-test('图评与文案的文字版式不预留类型标签行', () => {
-  assert.deepEqual(editorialTypography(), {
-    title: { fontSize: 64, lineHeight: 84 },
-    body: { fontSize: 42, lineHeight: 64 },
-    tags: { fontSize: 30, lineHeight: 40 }
-  })
+test('图评与文案文字在手机阅读尺寸下清晰且留在文字区内', () => {
+  const typography = editorialTypography()
+  const layout = editorialSideBySideLayout({ imageAspect: 0.75, titleLineCount: 3, bodyLineCount: 6 })
+  assert.ok(typography.title.fontSize >= 70)
+  assert.ok(typography.body.fontSize >= 48)
+  assert.ok(layout.text.x + 7 * typography.title.fontSize <= layout.canvas.width - 64)
+  assert.ok(layout.text.x + 10 * typography.body.fontSize <= layout.canvas.width - 64)
+  assert.ok(layout.text.tagsY < layout.qr.top)
 })
 
 test('竖图图评与文案的原图铺满成品高度，文字和二维码只在右侧', () => {
@@ -65,7 +67,7 @@ test('竖图图评与文案的原图铺满成品高度，文字和二维码只�
   assert.equal(layout.photo.height, layout.canvas.height)
   assert.equal(layout.photo.width, 1782)
   assert.equal(layout.photo.fit, 'cover')
-  assert.ok(layout.text.x + 12 * 42 <= layout.canvas.width - 64)
+  assert.ok(layout.text.x + 10 * editorialTypography().body.fontSize <= layout.canvas.width - 64)
   assert.ok(layout.text.tagsY < layout.qr.top)
   assert.ok(layout.qr.left >= layout.photo.width)
   assert.ok(layout.qr.left + layout.qr.size < layout.canvas.width)

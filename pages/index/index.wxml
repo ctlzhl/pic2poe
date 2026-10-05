@@ -1,11 +1,11 @@
 <view class="page">
   <view class="hero">
     <view class="eyebrow">照片有话说</view>
-    <view class="title">把此刻，写下来</view>
+    <view class="title ui-page-title">把此刻，写下来</view>
     <view class="subtitle">上传一张照片，选择你想听见的话。</view>
   </view>
 
-  <view class="image-card" bindtap="chooseImage">
+  <view class="image-card" role="button" aria-label="选择一张照片" bindtap="chooseImage">
     <image wx:if="{{imageUrl}}" class="preview" src="{{imageUrl}}" mode="aspectFit"></image>
     <view wx:else class="image-empty">
       <image class="empty-background" src="/assets/images/creation-upload-v1.jpg" mode="aspectFill"></image>
@@ -22,13 +22,8 @@
     <view wx:if="{{imageUrl && !preparing}}" class="change-mask">点击更换图片</view>
   </view>
 
-  <button wx:if="{{!imageUrl}}" class="secondary-button" loading="{{preparing}}" disabled="{{preparing || submitting}}" bindtap="chooseImage">上传图片</button>
-
-  <view wx:if="{{!imageUrl}}" class="guide-card">
-    <view class="guide-title">三步开始创作</view>
-    <view class="guide-item"><text>1</text>补充照片背后的故事</view>
-    <view class="guide-item"><text>2</text>选择想创作的内容类型</view>
-    <view class="guide-item"><text>3</text>查看并保存你的作品</view>
+  <view wx:if="{{!imageUrl}}" class="creation-steps" aria-label="选图、选类型、创作">
+    <view>选图</view><text>→</text><view>选类型</view><text>→</text><view>创作</view>
   </view>
 
   <view wx:if="{{showCreationForm}}" class="creation-form">
@@ -36,7 +31,7 @@
       <view class="section-label">选择想要的类型</view>
       <view class="type-list">
         <view wx:for="{{generateTypes}}" wx:key="value" class="type-item {{generateType === item.value ? 'selected' : ''}}" data-value="{{item.value}}" bindtap="selectGenerateType">
-          <view class="type-title">{{item.title}}</view>
+          <view class="type-title">{{item.title}}<text wx:if="{{generateType === item.value}}" class="selected-mark">✓</text></view>
           <view class="type-desc">{{item.description}}</view>
         </view>
       </view>
@@ -44,24 +39,24 @@
 
     <view class="section compact-section">
       <view class="section-label">这是在哪里？<text>可选</text></view>
-      <input class="text-input" maxlength="60" placeholder="例如：杭州西湖" value="{{location}}" bindinput="updateLocation" />
+      <input class="text-input {{focusedField === 'location' ? 'is-focused' : ''}}" maxlength="60" placeholder="例如：杭州西湖" placeholder-style="color:#697668" value="{{location}}" data-field="location" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="updateLocation" />
     </view>
 
     <view class="section compact-section">
       <view class="section-label">这一刻发生了什么？<text>可选</text></view>
-      <input class="text-input" maxlength="140" placeholder="此刻的心情或想说的话" value="{{moment}}" bindinput="updateMoment" />
+      <input class="text-input {{focusedField === 'moment' ? 'is-focused' : ''}}" maxlength="140" placeholder="此刻的心情或想说的话" placeholder-style="color:#697668" value="{{moment}}" data-field="moment" bindfocus="onFieldFocus" bindblur="onFieldBlur" bindinput="updateMoment" />
     </view>
 
     <view class="section compact-section">
       <view class="section-label">想要的感觉？<text>可选</text></view>
       <view class="mood-list">
-        <view wx:for="{{moods}}" wx:key="value" class="mood {{mood === item.value ? 'selected' : ''}}" data-value="{{item.value}}" bindtap="selectMood">{{item.title}}</view>
+        <view wx:for="{{moods}}" wx:key="value" class="mood {{mood === item.value ? 'selected' : ''}}" data-value="{{item.value}}" bindtap="selectMood"><text wx:if="{{mood === item.value}}" class="mood-check">✓</text>{{item.title}}</view>
       </view>
     </view>
 
   </view>
 
   <view wx:if="{{showCreationForm}}" class="creation-action-bar">
-    <button class="primary-button" loading="{{submitting}}" disabled="{{preparing || submitting || !assetId}}" bindtap="startCreation">开始创作</button>
+    <button class="ui-button ui-button-primary" loading="{{submitting}}" disabled="{{preparing || submitting || !assetId}}" bindtap="startCreation">开始创作</button>
   </view>
 </view>

@@ -8,18 +8,20 @@ function readPageFile(fileName) {
 }
 
 test('首页主按钮用 flex 明确水平与垂直居中', () => {
-  const source = readPageFile('home/home.wxss')
+  const source = readPageFile('../app.wxss')
+  const template = readPageFile('home/home.wxml')
 
-  assert.match(source, /\.hero-button\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center;[\s\S]*?padding:\s*0;[\s\S]*?line-height:\s*1;/)
+  assert.match(template, /class="ui-button ui-button-light hero-button"/)
+  assert.match(source, /\.ui-button\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center;/)
 })
 
 test('首页将创作说明呈现为一行三步向导', () => {
   const source = readPageFile('home/home.wxml')
 
   assert.match(source, /class="creation-guide"/)
-  assert.match(source, />上传照片<\/view>/)
-  assert.match(source, />选择创作<\/view>/)
-  assert.match(source, />收获文字<\/view>/)
+  assert.match(source, />选图<\/view>/)
+  assert.match(source, />选类型<\/view>/)
+  assert.match(source, />创作<\/view>/)
   assert.equal((source.match(/class="guide-arrow"/g) || []).length, 2)
 })
 

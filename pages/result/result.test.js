@@ -57,6 +57,26 @@ test('点击保存分享会直接打开已就绪图片的原生分享菜单', as
   }
 })
 
+test('竖图预览限制高度且不拉伸，点按可查看完整原图', () => {
+  const page = createPage(loadPageDefinition(), { work: { imageUrl: 'https://example.com/photo.jpg' } })
+  const originalWx = global.wx
+  let preview
+  global.wx = { previewImage(options) { preview = options } }
+  try {
+    page.onPhotoLoad({ detail: { width: 900, height: 1600 } })
+    assert.equal(page.data.photoWidth, 360)
+    assert.equal(page.data.photoHeight, 640)
+    page.previewPhoto()
+    assert.deepEqual(preview, { current: 'https://example.com/photo.jpg', urls: ['https://example.com/photo.jpg'] })
+    page.onPhotoLoad({ detail: { width: 1600, height: 900 } })
+    assert.equal(page.data.photoWidth, 686)
+    assert.equal(page.data.photoHeight, 386)
+  } finally {
+    if (originalWx === undefined) delete global.wx
+    else global.wx = originalWx
+  }
+})
+
 test('自己的结果页在分享凭证就绪前不开放好友和朋友圈入口', () => {
   const definition = loadPageDefinition()
   const page = createPage(definition)

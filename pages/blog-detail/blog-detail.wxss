@@ -1,11 +1,11 @@
 page { background: #fffdf9; }
 .page { min-height: 100vh; padding-bottom: 80rpx; color: #30372e; }
 .hero { width: 100%; height: 460rpx; background: #e6ebe3; }
-.category { margin: 46rpx 42rpx 0; color: #7b8875; font-size: 24rpx; }
+.category { margin: 46rpx 42rpx 0; color: #586e56; font-size: 24rpx; }
 .title { margin: 20rpx 42rpx 0; font-family: serif; font-size: 48rpx; font-weight: 600; line-height: 1.32; }
 .summary-card { margin: 34rpx 42rpx 0; padding: 24rpx 28rpx; border-left: 6rpx solid #91a88a; border-radius: 0 16rpx 16rpx 0; background: #f1f4ed; }
 .summary-label { color: #668064; font-size: 22rpx; font-weight: 600; letter-spacing: 2rpx; }
 .summary-copy { margin-top: 12rpx; color: #5e685a; font-size: 27rpx; line-height: 1.72; }
 .content { display: block; margin: 42rpx; color: #4c5549; font-size: 31rpx; line-height: 1.9; }
-.state { padding: 160rpx 30rpx; color: #7c8578; font-size: 28rpx; text-align: center; }
+.state { padding: 160rpx 30rpx; color: #576956; font-size: 28rpx; text-align: center; }
 .retry { margin-top: 22rpx; color: #4f704f; }

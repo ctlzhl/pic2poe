@@ -4,6 +4,7 @@ const { showErrorToast } = require('../../utils/errorHandler')
 const POLL_INTERVAL = 2000
 const RUN_TIMEOUT = 65000
 const SUCCESS_COUNTDOWN_SECONDS = 3
+const TYPE_TITLE = { poem: '五言绝句', review: '图片点评', copy: '配图文案' }
 const STATUS_TEXT = {
   queued: '已收到，正在排队创作',
   analyzing: '正在读懂照片里的画面',
@@ -12,6 +13,7 @@ const STATUS_TEXT = {
   succeeded: '创作完成',
   failed: '这次创作没有完成'
 }
+const STATUS_PROGRESS = { queued: 12, analyzing: 36, generating: 70, validating: 90, succeeded: 100 }
 
 Page({
   data: {
@@ -22,7 +24,11 @@ Page({
     workId: '',
     errorMessage: '',
     retrying: false,
-    countdown: SUCCESS_COUNTDOWN_SECONDS
+    countdown: SUCCESS_COUNTDOWN_SECONDS,
+    previewUrl: '',
+    typeTitle: '',
+    progressPercent: STATUS_PROGRESS.queued,
+    showSlowMessage: false
   },
 
   onLoad(options) {
@@ -32,7 +38,12 @@ Page({
       wx.navigateBack()
       return
     }
-    this.setData({ taskId })
+    const preview = typeof options.preview === 'string' ? options.preview : ''
+    let previewUrl = preview
+    if (preview && !/^(?:wxfile:|https?:|\/)/.test(preview)) {
+      try { previewUrl = decodeURIComponent(preview) } catch (error) { previewUrl = '' }
+    }
+    this.setData({ taskId, previewUrl, typeTitle: TYPE_TITLE[options.type] || '' })
     this.startPolling()
     this.requestRun()
   },
@@ -75,7 +86,7 @@ Page({
     this.pollTimer = setInterval(() => this.pollTask(), POLL_INTERVAL)
     this.slowTimer = setTimeout(() => {
       if (!['failed', 'succeeded'].includes(this.data.status)) {
-        wx.showToast({ title: '正在努力创作中', icon: 'none' })
+        this.setData({ showSlowMessage: true })
       }
     }, 10000)
   },
@@ -93,6 +104,8 @@ Page({
       this.setData({
         status,
         statusText: STATUS_TEXT[status] || '正在创作',
+        progressPercent: STATUS_PROGRESS[status] || this.data.progressPercent,
+        showSlowMessage: ['failed', 'succeeded'].includes(status) ? false : this.data.showSlowMessage,
         attemptNumber: task.attemptNumber || 1,
         workId: task.workId || '',
         errorMessage: task.errorMessage || ''
@@ -106,6 +119,13 @@ Page({
     } finally {
       this.pollInFlight = false
     }
+  },
+
+  reconnect() {
+    if (['failed', 'succeeded'].includes(this.data.status)) return
+    this.setData({ showSlowMessage: false })
+    this.startPolling()
+    this.requestRun()
   },
 
   async requestRun() {
@@ -129,7 +149,7 @@ Page({
       const response = await callFunctionWithTimeout('retryCreation', { taskId: this.data.taskId })
       if (!response.result?.ok) throw new Error(response.result?.message || '重新创作失败')
       this.stopSuccessCountdown()
-      this.setData({ status: 'queued', statusText: STATUS_TEXT.queued, errorMessage: '' })
+      this.setData({ status: 'queued', statusText: STATUS_TEXT.queued, progressPercent: STATUS_PROGRESS.queued, showSlowMessage: false, errorMessage: '' })
       this.startPolling()
       this.requestRun()
     } catch (error) {

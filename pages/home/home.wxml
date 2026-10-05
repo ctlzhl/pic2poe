@@ -6,16 +6,16 @@
       <view class="eyebrow">TRAVEL · WORDS · MEMORY</view>
       <view class="title">让一张照片，<br/>长出诗和回忆。</view>
       <view class="subtitle">从光影里，找一句话。</view>
-      <button class="hero-button" bindtap="startCreation">开始创作</button>
+      <button class="ui-button ui-button-light hero-button" bindtap="startCreation">开始创作</button>
     </view>
   </view>
 
   <view class="creation-guide">
-    <view class="guide-step"><view class="guide-index">1</view><view>上传照片</view></view>
+    <view class="guide-step"><view class="guide-index">1</view><view>选图</view></view>
     <view class="guide-arrow">›</view>
-    <view class="guide-step"><view class="guide-index">2</view><view>选择创作</view></view>
+    <view class="guide-step"><view class="guide-index">2</view><view>选类型</view></view>
     <view class="guide-arrow">›</view>
-    <view class="guide-step"><view class="guide-index">3</view><view>收获文字</view></view>
+    <view class="guide-step"><view class="guide-index">3</view><view>创作</view></view>
   </view>
 
   <view class="blog-head">
@@ -30,11 +30,11 @@
   </view>
   <view wx:elif="{{!posts.length}}" class="blog-state">暂时没有可展示的文章。</view>
   <view wx:else class="post-list">
-    <view wx:for="{{posts}}" wx:key="id" class="post-card" data-post-id="{{item.id}}" bindtap="openPost">
+    <view wx:for="{{posts}}" wx:key="id" class="post-card ui-card" data-post-id="{{item.id}}" bindtap="openPost">
       <image wx:if="{{item.featuredImage}}" class="post-cover" src="{{item.featuredImage}}" mode="aspectFill" data-index="{{index}}" binderror="onCoverError"></image>
       <view wx:else class="post-cover placeholder"><view class="placeholder-mark">✦</view><view class="placeholder-label">{{item.categoryName || '随笔'}}</view></view>
       <view class="post-body">
-        <view class="post-meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>
+        <view class="post-meta ui-meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>
         <view class="post-title">{{item.title}}</view>
         <view class="post-excerpt">{{item.excerpt}}</view>
       </view>

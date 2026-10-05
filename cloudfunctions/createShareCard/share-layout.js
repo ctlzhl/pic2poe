@@ -4,9 +4,9 @@ const SIDE_TEXT_WIDTH = 640
 const QR_SIZE = 150
 
 const editorialTypography = () => ({
-  title: { fontSize: 64, lineHeight: 84 },
-  body: { fontSize: 42, lineHeight: 64 },
-  tags: { fontSize: 30, lineHeight: 40 }
+  title: { fontSize: 72, lineHeight: 94 },
+  body: { fontSize: 50, lineHeight: 74 },
+  tags: { fontSize: 32, lineHeight: 44 }
 })
 
 const visualImageAspect = ({ width = 1, height = 1, orientation = 1 } = {}) => {

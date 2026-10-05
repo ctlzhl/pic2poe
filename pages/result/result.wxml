@@ -3,25 +3,26 @@
 
   <view wx:elif="{{hasError}}" class="center-state">
     <view>{{errorMessage}}</view>
-    <button class="primary-button" bindtap="createAgain">返回创作页</button>
+    <button class="ui-button ui-button-primary" bindtap="createAgain">返回创作页</button>
   </view>
 
   <view wx:else class="content">
     <view class="eyebrow">照片有话说 · {{typeTitle}}</view>
-    <image class="photo" src="{{work.imageUrl}}" mode="widthFix" show-menu-by-longpress></image>
+    <view class="photo-stage"><image class="photo" src="{{work.imageUrl}}" mode="aspectFit" style="width: {{photoWidth}}rpx; height: {{photoHeight}}rpx;" bindload="onPhotoLoad" bindtap="previewPhoto" show-menu-by-longpress></image></view>
+    <view class="photo-hint">点按照片查看原图</view>
 
-    <view wx:if="{{work.type === 'poem'}}" class="paper poem-paper">
+    <view wx:if="{{work.type === 'poem'}}" class="paper poem-paper ui-card">
       <view class="poem-title">{{work.content.poem.title}}</view>
       <view wx:for="{{work.content.poem.lines}}" wx:key="*this" class="poem-line">{{item}}</view>
     </view>
 
-    <view wx:elif="{{work.type === 'review'}}" class="paper">
+    <view wx:elif="{{work.type === 'review'}}" class="paper ui-card">
       <view class="content-title">{{work.content.review.headline}}</view>
       <view class="body">{{work.content.review.body}}</view>
       <view class="tag-list"><text wx:for="{{work.content.review.observations}}" wx:key="*this" class="tag">{{item}}</text></view>
     </view>
 
-    <view wx:else class="paper">
+    <view wx:else class="paper ui-card">
       <view class="label">{{work.content.copy.label}}</view>
       <view class="content-title">{{work.content.copy.headline}}</view>
       <view class="body">{{work.content.copy.body}}</view>
@@ -35,7 +36,7 @@
     </view>
 
     <view wx:else class="actions">
-      <button class="primary-button" bindtap="createAgain">我也要创作</button>
+      <button class="ui-button ui-button-primary" bindtap="createAgain">我也要创作</button>
     </view>
 
   </view>

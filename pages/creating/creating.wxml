@@ -5,9 +5,16 @@
     <view class="title">{{status === 'failed' ? '再试一次' : status === 'succeeded' ? '写好了' : '正在创作'}}</view>
     <view class="status-copy">{{statusText}}</view>
 
+    <view wx:if="{{previewUrl || typeTitle}}" class="work-context">
+      <image wx:if="{{previewUrl}}" class="context-photo" src="{{previewUrl}}" mode="aspectFill"></image>
+      <view class="context-copy"><view>{{typeTitle || '照片作品'}}</view><view class="context-note">这一张照片，正在写成作品</view></view>
+    </view>
+
     <view wx:if="{{status !== 'failed' && status !== 'succeeded'}}" class="loader-wrap">
       <view class="loader"></view>
-      <view class="hint">请不要关闭页面，通常只需要片刻。</view>
+      <view class="progress-track"><view class="progress-fill" style="width: {{progressPercent}}%;"></view></view>
+      <view class="hint">任务已提交，进度会持续更新。</view>
+      <view wx:if="{{showSlowMessage}}" class="slow-message"><view>这次稍慢一些，正在继续查询进度。</view><view class="reconnect-action" role="button" bindtap="reconnect">重新连接</view></view>
     </view>
 
     <view wx:if="{{status === 'failed'}}" class="failure-card">
@@ -15,10 +22,10 @@
       <view class="attempt">第 {{attemptNumber}} 次尝试</view>
     </view>
 
-    <button wx:if="{{status === 'failed'}}" class="primary-button" loading="{{retrying}}" bindtap="retry">重新生成</button>
-    <button wx:if="{{status === 'failed'}}" class="secondary-button" bindtap="backToCreate">返回创作页</button>
+    <button wx:if="{{status === 'failed'}}" class="ui-button ui-button-primary primary-button" loading="{{retrying}}" bindtap="retry">重新创作</button>
+    <button wx:if="{{status === 'failed'}}" class="ui-button ui-button-secondary secondary-button" bindtap="backToCreate">返回创作页</button>
     <view wx:if="{{status === 'succeeded'}}" class="success-countdown">{{countdown}} 秒后自动查看结果</view>
-    <button wx:if="{{status === 'succeeded'}}" class="primary-button" bindtap="goResult">查看结果</button>
+    <button wx:if="{{status === 'succeeded'}}" class="ui-button ui-button-primary primary-button" bindtap="goResult">查看结果</button>
   </view>
   <bottom-nav active="create"></bottom-nav>
 </view>

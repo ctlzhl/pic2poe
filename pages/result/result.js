@@ -29,7 +29,22 @@ Page({
     shareTitle: '照片有话说',
     shareImageUrl: '',
     shareLoading: false,
-    shareError: ''
+    shareError: '',
+    photoWidth: 686,
+    photoHeight: 420
+  },
+
+  onPhotoLoad(event) {
+    const width = Number(event.detail?.width)
+    const height = Number(event.detail?.height)
+    if (!(width > 0 && height > 0)) return
+    const photoHeight = Math.min(640, Math.max(1, Math.round(686 * height / width)))
+    this.setData({ photoWidth: Math.min(686, Math.round(photoHeight * width / height)), photoHeight })
+  },
+
+  previewPhoto() {
+    const imageUrl = this.data.work?.imageUrl
+    if (imageUrl) wx.previewImage({ current: imageUrl, urls: [imageUrl] })
   },
 
   onLoad(options) {
@@ -216,7 +231,9 @@ Page({
         idempotencyKey: `rewrite_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
       })
       if (!response.result?.ok) throw new Error(response.result?.message || '创建重写任务失败')
-      wx.redirectTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}` })
+      const preview = encodeURIComponent(this.data.work?.imageUrl || '')
+      const type = this.data.work?.type || ''
+      wx.redirectTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}&type=${type}&preview=${preview}` })
     } catch (error) {
       console.error('同图重写失败:', error)
       showErrorToast(error, '同图重写失败，请稍后再试。')

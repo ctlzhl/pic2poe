@@ -128,3 +128,26 @@ test('页面隐藏后不接收之前发出的轮询结果', async () => {
   assert.equal(page.data.status, 'queued')
   assert.equal(page.data.workId, '')
 })
+
+test('创作中页面恢复照片与类型，并随任务状态显示进度', async () => {
+  const helper = require('../../utils/requestHelper')
+  const originalCall = helper.callFunctionWithTimeout
+  helper.callFunctionWithTimeout = async () => ({ result: { ok: true, data: { status: 'generating', workId: '' } } })
+  let definition
+  try { definition = loadPageDefinition() } finally { helper.callFunctionWithTimeout = originalCall }
+  const page = createPage(definition, { taskId: 'task-1' })
+  page.pageVisible = true
+  try {
+    page.onLoad({ taskId: 'task-1', type: 'review', preview: 'wxfile%3A%2F%2Fphoto.jpg' })
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(page.data.previewUrl, 'wxfile://photo.jpg')
+    assert.equal(page.data.typeTitle, '图片点评')
+    assert.equal(page.data.progressPercent, 70)
+    assert.equal(page.data.statusText, '正在写下这一刻')
+    page.setData({ showSlowMessage: true })
+    await page.pollTask()
+    assert.equal(page.data.showSlowMessage, true)
+  } finally {
+    page.stopPolling()
+  }
+})

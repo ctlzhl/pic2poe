@@ -1,22 +1,22 @@
 page { background: #f8f7f2; }
 .page { min-height: 100vh; padding: 34rpx 32rpx 120rpx; box-sizing: border-box; color: #273027; }
-.hero-card { position: relative; height: 720rpx; overflow: hidden; border-radius: 32rpx; box-shadow: 0 24rpx 50rpx rgba(52, 64, 46, .18); }
+.hero-card { position: relative; height: 560rpx; overflow: hidden; border-radius: 28rpx; box-shadow: 0 12rpx 30rpx rgba(52, 64, 46, .12); }
 .hero-image, .hero-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-shade { background: linear-gradient(180deg, rgba(19, 29, 21, .24), rgba(22, 34, 24, .5)); }
-.hero-content { position: relative; z-index: 1; display: flex; height: 100%; padding: 64rpx 44rpx 48rpx; box-sizing: border-box; flex-direction: column; justify-content: flex-end; color: #fff; }
+.hero-content { position: relative; z-index: 1; display: flex; height: 100%; padding: 42rpx 40rpx 38rpx; box-sizing: border-box; flex-direction: column; justify-content: flex-end; color: #fff; }
 .eyebrow { font-size: 20rpx; letter-spacing: 4rpx; opacity: .86; }
 .title { margin-top: 22rpx; font-family: serif; font-size: 54rpx; font-weight: 600; line-height: 1.25; letter-spacing: 1rpx; }
 .subtitle { margin-top: 18rpx; font-size: 28rpx; opacity: .94; }
-.hero-button { display: flex; align-items: center; justify-content: center; width: 240rpx; height: 82rpx; margin: 38rpx 0 0; padding: 0; border-radius: 42rpx; background: #f7f3e9; color: #38543b; font-size: 28rpx; font-weight: 600; line-height: 1; }
+.hero-button { width: 240rpx; height: 82rpx; margin: 30rpx 0 0; font-size: 28rpx; }
 .hero-button::after { border: 0; }
-.creation-guide { display: flex; align-items: center; justify-content: center; gap: 14rpx; margin: 38rpx 0 16rpx; color: #60715f; font-size: 25rpx; white-space: nowrap; }
+.creation-guide { display: flex; align-items: center; justify-content: center; gap: 14rpx; margin: 30rpx 0 12rpx; color: #536a53; font-size: 25rpx; white-space: nowrap; }
 .guide-step { display: flex; align-items: center; gap: 8rpx; }
 .guide-index { display: flex; width: 32rpx; height: 32rpx; align-items: center; justify-content: center; border-radius: 50%; background: #e0e7da; color: #52704f; font-size: 20rpx; }
 .guide-arrow { color: #9aa695; font-size: 34rpx; font-weight: 300; line-height: 1; }
-.blog-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 68rpx; margin-bottom: 28rpx; }
+.blog-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 46rpx; margin-bottom: 24rpx; }
 .blog-title { font-family: serif; font-size: 40rpx; font-weight: 600; }.more-link, .retry-link { color: #4f704f; font-size: 26rpx; }
-.blog-state { padding: 52rpx 20rpx; color: #7c8578; font-size: 27rpx; text-align: center; }.retry-link { margin-top: 18rpx; }
+.blog-state { padding: 52rpx 20rpx; color: #596758; font-size: 27rpx; text-align: center; }.retry-link { margin-top: 18rpx; }
 .post-list { display: flex; flex-direction: column; gap: 22rpx; }
-.post-card { display: flex; overflow: hidden; border-radius: 22rpx; background: #fff; box-shadow: 0 8rpx 22rpx rgba(50, 60, 47, .06); }
+.post-card { display: flex; overflow: hidden; }
 .post-cover { width: 204rpx; height: 204rpx; flex: 0 0 204rpx; background: #e2e7de; }.placeholder { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8rpx; background: linear-gradient(145deg, #dbe4d4, #f1ecdf); color: #70836f; }.placeholder-mark { font-size: 38rpx; line-height: 1; }.placeholder-label { font-size: 22rpx; letter-spacing: 3rpx; }
-.post-body { min-width: 0; padding: 22rpx 22rpx 18rpx; }.post-meta { color: #869080; font-size: 20rpx; }.post-title { margin-top: 9rpx; overflow: hidden; font-size: 29rpx; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.post-excerpt { display: -webkit-box; margin-top: 10rpx; overflow: hidden; color: #737b70; font-size: 23rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.post-body { min-width: 0; padding: 22rpx 22rpx 18rpx; }.post-title { margin-top: 9rpx; overflow: hidden; font-size: 29rpx; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.post-excerpt { display: -webkit-box; margin-top: 10rpx; overflow: hidden; color: #596658; font-size: 24rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

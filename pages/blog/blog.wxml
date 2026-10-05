@@ -1,16 +1,16 @@
 <view class="page">
   <scroll-view class="category-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
     <view class="category-tabs">
-      <view wx:for="{{categories}}" wx:key="id" class="category-chip {{selectedCategoryId === item.id ? 'is-active' : ''}}" data-category-id="{{item.id}}" bindtap="selectCategory">{{item.name}}</view>
+      <view wx:for="{{categories}}" wx:key="id" class="category-chip {{selectedCategoryId === item.id ? 'is-active' : ''}}" data-category-id="{{item.id}}" bindtap="selectCategory"><text wx:if="{{selectedCategoryId === item.id}}" class="category-check">✓</text>{{item.name}}</view>
     </view>
   </scroll-view>
   <view wx:if="{{loading && !posts.length}}" class="state">正在加载文章…</view>
   <view wx:elif="{{errorMessage && !posts.length}}" class="state"><view>{{errorMessage}}</view><view class="retry" bindtap="reload">重新加载</view></view>
   <view wx:else class="list">
-    <view wx:for="{{posts}}" wx:key="id" class="post" data-post-id="{{item.id}}" bindtap="openPost">
+    <view wx:for="{{posts}}" wx:key="id" class="post ui-card" data-post-id="{{item.id}}" bindtap="openPost">
       <image wx:if="{{item.featuredImage}}" class="cover" src="{{item.featuredImage}}" mode="aspectFill" lazy-load data-index="{{index}}" binderror="onCoverError"></image>
       <view wx:else class="cover placeholder"><view class="placeholder-mark">✦</view><view class="placeholder-label">{{item.categoryName || '随笔'}}</view></view>
-      <view class="meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>
+      <view class="meta ui-meta">{{item.categoryName || '随笔'}} · {{item.publishedLabel}}</view>
       <view class="title">{{item.title}}</view>
       <view class="excerpt">{{item.excerpt}}</view>
     </view>

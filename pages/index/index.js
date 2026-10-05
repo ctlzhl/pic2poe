@@ -57,6 +57,7 @@ Page({
     moods,
     generateType: 'poem',
     mood: 'auto',
+    focusedField: '',
     location: '',
     moment: ''
   },
@@ -83,6 +84,7 @@ Page({
       submitting: false,
       generateType: 'poem',
       mood: 'auto',
+      focusedField: '',
       location: '',
       moment: ''
     })
@@ -286,6 +288,14 @@ Page({
     this.setData({ moment: event.detail.value })
   },
 
+  onFieldFocus(event) {
+    this.setData({ focusedField: event.currentTarget.dataset.field || '' })
+  },
+
+  onFieldBlur(event) {
+    if (this.data.focusedField === event.currentTarget.dataset.field) this.setData({ focusedField: '' })
+  },
+
   async startCreation() {
     const { assetId, idempotencyKey, preparing, submitting, generateType, mood, location, moment } = this.data
     if (preparing) return
@@ -312,7 +322,8 @@ Page({
       }
 
       this.setData({ idempotencyKey: createIdempotencyKey() })
-      wx.navigateTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}` })
+      const preview = encodeURIComponent(this.data.imageUrl || '')
+      wx.navigateTo({ url: `/pages/creating/creating?taskId=${response.result.data.taskId}&type=${generateType}&preview=${preview}` })
     } catch (error) {
       console.error('创建创作任务失败:', error)
       showErrorToast(error, '创建创作任务失败，请稍后重试。')

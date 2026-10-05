@@ -7,7 +7,7 @@ const { checkImage, checkText } = require('./security-core')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const TEMPLATE_VERSION = 'share-v9'
+const TEMPLATE_VERSION = 'share-v10'
 const CARD_BACKGROUND = '#f7f1e7'
 const WXACODE_PAGE = 'pages/result/result'
 let sharp
@@ -223,8 +223,8 @@ const renderEditorialCard = async (work, source, qr, metadata) => {
   const editorialLayout = editorialLayoutFor(metadata)
 
   if (editorialLayout.kind === 'side-by-side') {
-    const titleLines = wrapText(headline, 8, 3)
-    const bodyLines = wrapText(body, 12, isReview ? 5 : 6)
+    const titleLines = wrapText(headline, 7, 3)
+    const bodyLines = wrapText(body, 10, isReview ? 5 : 6)
     const sideTagLine = truncate(tagLine, 14)
     const layout = editorialSideBySideLayout({
       imageAspect: editorialLayout.imageAspect,

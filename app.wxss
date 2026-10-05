@@ -1,6 +1,8 @@
 /**app.wxss**/
 page {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #f8f7f2;
+  color: #273027;
 }
 
 .container {
@@ -16,6 +18,43 @@ button {
 button::after {
   border: none;
 }
+
+/* 通用控件尺度：大按钮 94rpx、正文 28-30rpx、辅助文字 24-26rpx。 */
+.ui-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 94rpx;
+  margin: 0;
+  padding: 0 24rpx;
+  border-radius: 47rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ui-button-primary { background: #4a684c; color: #fff; }
+.ui-button-secondary { background: #edf2e9; color: #355638; }
+.ui-button-light { background: #f7f3e9; color: #38543b; }
+.ui-button[disabled] { background: #aeb8aa; color: #fff; }
+
+.ui-page-title {
+  font-family: serif;
+  font-size: 56rpx;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 1rpx;
+}
+
+.ui-card {
+  border-radius: 22rpx;
+  background: #fffdf8;
+  box-shadow: 0 5rpx 18rpx rgba(47, 57, 44, .05);
+}
+
+.ui-meta { color: #5d715a; font-size: 24rpx; }
 
 /* 加载动画 */
 .loading {

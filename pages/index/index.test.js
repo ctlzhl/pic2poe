@@ -44,6 +44,28 @@ test('一次创作受理后再次创作使用新的幂等键', async () => {
   }
 })
 
+test('进入创作中页面时保留本次照片与创作类型', async () => {
+  const definition = loadPageDefinition()
+  const previousWx = global.wx
+  let destination = ''
+  global.wx = {
+    cloud: { callFunction({ success }) { success({ result: { ok: true, data: { taskId: 'task-1' } } }) } },
+    showLoading() {}, hideLoading() {},
+    navigateTo({ url }) { destination = url }
+  }
+  try {
+    const page = createPage(definition, {
+      assetId: 'asset-1', idempotencyKey: 'key-1', prepareState: 'ready',
+      imageUrl: 'wxfile://photo with space.jpg', generateType: 'review'
+    })
+    await page.startCreation()
+    assert.equal(destination, '/pages/creating/creating?taskId=task-1&type=review&preview=wxfile%3A%2F%2Fphoto%20with%20space.jpg')
+  } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})
+
 test('图片处理失败时回收已经上传的暂存文件', async () => {
   const definition = loadPageDefinition()
   const previousWx = global.wx
