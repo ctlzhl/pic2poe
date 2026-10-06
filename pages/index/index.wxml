@@ -26,6 +26,15 @@
     <view>选图</view><text>→</text><view>选类型</view><text>→</text><view>创作</view>
   </view>
 
+  <view wx:if="{{!imageUrl}}" class="type-preview">
+    <view class="type-preview-heading">一张照片，三种表达</view>
+    <view class="type-preview-note">选好照片，再决定怎么写。</view>
+    <view wx:for="{{generateTypes}}" wx:key="value" class="type-preview-row">
+      <view class="type-preview-title">{{item.title}}</view>
+      <view class="type-preview-description">{{item.description}}</view>
+    </view>
+  </view>
+
   <view wx:if="{{showCreationForm}}" class="creation-form">
     <view class="section">
       <view class="section-label">选择想要的类型</view>

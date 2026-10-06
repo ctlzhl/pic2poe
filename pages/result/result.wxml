@@ -7,9 +7,7 @@
   </view>
 
   <view wx:else class="content">
-    <view class="eyebrow">照片有话说 · {{typeTitle}}</view>
     <view class="photo-stage"><image class="photo" src="{{work.imageUrl}}" mode="aspectFit" style="width: {{photoWidth}}rpx; height: {{photoHeight}}rpx;" bindload="onPhotoLoad" bindtap="previewPhoto" show-menu-by-longpress></image></view>
-    <view class="photo-hint">点按照片查看原图</view>
 
     <view wx:if="{{work.type === 'poem'}}" class="paper poem-paper ui-card">
       <view class="poem-title">{{work.content.poem.title}}</view>

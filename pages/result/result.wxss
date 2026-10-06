@@ -1,12 +1,10 @@
 page { min-height: 100%; background: #f8f7f2; color: #273025; }
 .page { min-height: 100vh; }
 .center-state { min-height: 100vh; padding: 0 56rpx; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #667062; font-size: 30rpx; text-align: center; }
-.content { padding: 36rpx 32rpx 184rpx; }
-.eyebrow { margin-bottom: 22rpx; color: #596e58; font-size: 24rpx; letter-spacing: 3rpx; }
+.content { padding: 24rpx 32rpx 184rpx; }
 .photo-stage { display: flex; align-items: center; justify-content: center; min-height: 280rpx; border-radius: 22rpx; background: #e5e7df; overflow: hidden; }
 .photo { display: block; border-radius: 18rpx; }
-.photo-hint { margin-top: 10rpx; color: #5b6b59; font-size: 24rpx; text-align: center; }
-.paper { margin-top: 20rpx; padding: 36rpx 32rpx; }
+.paper { margin-top: 28rpx; padding: 36rpx 32rpx; }
 .poem-paper { text-align: center; font-family: 'Songti SC', 'STKaiti', serif; }
 .poem-title, .content-title { color: #2e392d; font-size: 42rpx; font-weight: 600; line-height: 1.35; }
 .poem-title { margin-bottom: 26rpx; }

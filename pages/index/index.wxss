@@ -20,6 +20,12 @@ page { background: #f8f7f2; color: #20251f; }
 .image-card:active .change-mask { opacity: 1; }
 .creation-steps { display: flex; align-items: center; justify-content: center; gap: 20rpx; margin-top: 30rpx; color: #50664f; font-size: 25rpx; }
 .creation-steps text { color: #83917f; }
+.type-preview { margin-top: 52rpx; }
+.type-preview-heading { color: #313b30; font-family: serif; font-size: 34rpx; font-weight: 600; }
+.type-preview-note { margin-top: 8rpx; margin-bottom: 20rpx; color: #647160; font-size: 24rpx; }
+.type-preview-row { display: flex; align-items: baseline; gap: 28rpx; padding: 22rpx 4rpx; border-top: 1rpx solid #dfe5da; }
+.type-preview-title { flex: 0 0 136rpx; color: #364a35; font-size: 28rpx; font-weight: 600; }
+.type-preview-description { min-width: 0; color: #5e6b5b; font-size: 25rpx; line-height: 1.45; }
 .creation-form { padding-bottom: 136rpx; }
 .creation-action-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; padding: 16rpx 32rpx 12rpx; box-sizing: border-box; background: rgba(248, 247, 242, 0.98); box-shadow: 0 -10rpx 26rpx rgba(48, 56, 43, 0.08); }
 .section { margin-top: 36rpx; }

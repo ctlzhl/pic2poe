@@ -2,11 +2,6 @@ const { callFunctionWithTimeout, downloadFileWithTimeout } = require('../../util
 const { showErrorToast } = require('../../utils/errorHandler')
 
 const SHARE_TIMEOUT = 55000
-const TYPE_TITLE = {
-  poem: '五言绝句',
-  review: '图片点评',
-  copy: '配图文案'
-}
 
 const parseShareToken = (options = {}) => {
   if (typeof options.shareToken === 'string' && options.shareToken) return options.shareToken
@@ -23,7 +18,6 @@ Page({
     errorMessage: '',
     work: null,
     workId: '',
-    typeTitle: '',
     isShared: false,
     shareToken: '',
     shareTitle: '照片有话说',
@@ -82,8 +76,7 @@ Page({
       this.setData({
         loading: false,
         work,
-        workId,
-        typeTitle: TYPE_TITLE[work.type] || '创作结果'
+        workId
       })
       this.prepareShareCard(workId)
     } catch (error) {
@@ -104,8 +97,7 @@ Page({
         shareToken,
         shareTitle: work.shareTitle || '照片有话说',
         shareImageUrl: work.shareImageUrl || '',
-        work,
-        typeTitle: TYPE_TITLE[work.type] || '创作结果'
+        work
       })
     } catch (error) {
       console.error('读取分享内容失败:', error)
