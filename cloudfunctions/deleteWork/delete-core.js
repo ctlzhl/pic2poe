@@ -4,4 +4,20 @@ const findRemainingWork = (deletedWorkId, relatedWorks = []) => relatedWorks.fin
 
 const shareFileIdsForDeletion = (shares = []) => shares.map((share) => share?.fileId).filter(Boolean)
 
-module.exports = { shouldDeleteAsset, findRemainingWork, shareFileIdsForDeletion }
+const revokeReadyShares = async (fetchBatch, revokeShare) => {
+  const revoked = []
+  const seen = new Set()
+  while (true) {
+    const batch = await fetchBatch()
+    if (!batch.length) return revoked
+    if (batch.some((share) => seen.has(share._id))) throw new Error('SHARE_REVOKE_STALLED')
+    for (let index = 0; index < batch.length; index += 20) {
+      const part = batch.slice(index, index + 20)
+      await Promise.all(part.map(revokeShare))
+      revoked.push(...part)
+      part.forEach((share) => seen.add(share._id))
+    }
+  }
+}
+
+module.exports = { shouldDeleteAsset, findRemainingWork, shareFileIdsForDeletion, revokeReadyShares }

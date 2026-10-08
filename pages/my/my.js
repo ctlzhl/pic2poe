@@ -1,12 +1,15 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
 const { formatDotDate } = require('../../utils/date')
+const { isProfileSignedIn, signInProfile } = require('../../utils/profileSession')
 
 const TYPE_TITLE = { poem: '五言绝句', review: '图片点评', copy: '配图文案' }
 const PROFILE_REFRESH_INTERVAL_MS = 30 * 60 * 1000
 
 Page({
   data: {
+    signedOut: false,
+    loggingIn: false,
     profileLoading: true,
     authorized: false,
     authorizing: false,
@@ -20,9 +23,18 @@ Page({
   },
 
   onShow() {
+    if (!isProfileSignedIn()) {
+      this.profileResolved = false
+      this.setData({
+        signedOut: true, profileLoading: false, authorized: false, profile: {},
+        works: [], totalWorks: 0, loading: false, errorMessage: ''
+      })
+      return
+    }
+    if (this.data.signedOut) this.setData({ signedOut: false })
     if (this.profileLoadPromise) return this.profileLoadPromise
     if (!this.profileResolved || Date.now() - this.profileConfirmedAt >= PROFILE_REFRESH_INTERVAL_MS) return this.loadProfile()
-    return this.data.authorized ? this.loadRecentWorks() : undefined
+    return this.loadRecentWorks()
   },
 
   loadProfile() {
@@ -32,17 +44,18 @@ Page({
     this.profileLoadPromise = (async () => {
       try {
         const response = await callFunctionWithTimeout('userProfile', { action: 'get' })
+        if (!isProfileSignedIn()) return
         if (!response.result?.ok) throw new Error(response.result?.message || '登录状态确认失败，请稍后再试。')
         const { authorized, profile } = response.result.data || {}
         this.setData({ authorized: Boolean(authorized), profile: profile || {} })
         this.profileResolved = true
         this.profileConfirmedAt = Date.now()
-        if (authorized) await this.loadRecentWorks()
       } catch (error) {
         console.error('读取用户资料失败:', error)
         if (!this.profileResolved) this.setData({ authorized: false })
         showErrorToast(error, '登录状态确认失败，请稍后再试。')
       } finally {
+        if (isProfileSignedIn()) await this.loadRecentWorks()
         if (needsInitialLoading) this.setData({ profileLoading: false })
         this.profileLoadPromise = null
       }
@@ -107,7 +120,7 @@ Page({
             profile: { ...(response.result.data?.profile || {}), ...this.pendingProfileChanges }
           })
         }
-        if (authorized) await this.loadRecentWorks()
+        await this.loadRecentWorks()
       } catch (error) {
         console.error('微信资料保存失败:', error)
         showErrorToast(error, '资料保存失败，请稍后再试。')
@@ -120,9 +133,11 @@ Page({
   },
 
   async loadRecentWorks() {
+    if (!isProfileSignedIn()) return
     this.setData({ loading: true, errorMessage: '' })
     try {
       const response = await callFunctionWithTimeout('listWorks', { limit: 8 })
+      if (!isProfileSignedIn()) return
       if (!response.result?.ok) throw new Error(response.result?.message || '读取作品失败')
       const works = (response.result.data?.works || []).map((work) => ({
         ...work,
@@ -139,8 +154,31 @@ Page({
     }
   },
 
+  async loginProfile() {
+    if (this.data.loggingIn) return
+    this.setData({ loggingIn: true })
+    try {
+      await new Promise((resolve, reject) => wx.login({
+        success: (result) => result?.code ? resolve() : reject(new Error('微信登录失败，请重试。')),
+        fail: reject
+      }))
+      const response = await callFunctionWithTimeout('userProfile', { action: 'get' })
+      if (!response.result?.ok) throw new Error(response.result?.message || '微信身份确认失败，请重试。')
+      signInProfile()
+      const { authorized, profile } = response.result.data || {}
+      this.profileResolved = true
+      this.profileConfirmedAt = Date.now()
+      this.setData({ signedOut: false, profileLoading: false, authorized: Boolean(authorized), profile: profile || {} })
+      await this.loadRecentWorks()
+    } catch (error) {
+      showErrorToast(error, '微信登录失败，请稍后重试。')
+    } finally {
+      this.setData({ loggingIn: false })
+    }
+  },
+
   openWork(event) { const workId = event.currentTarget.dataset.workId; if (workId) wx.navigateTo({ url: `/pages/result/result?workId=${workId}` }) },
-  openAllWorks() { wx.navigateTo({ url: '/pages/works/works' }) },
+  openAllWorks() { if (isProfileSignedIn()) wx.navigateTo({ url: '/pages/works/works' }) },
   openSettings() { wx.navigateTo({ url: '/pages/settings/settings' }) },
   startCreation() { wx.switchTab({ url: '/pages/index/index' }) }
 })

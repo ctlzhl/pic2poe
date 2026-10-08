@@ -1,5 +1,5 @@
 const cloud = require('wx-server-sdk')
-const { findRemainingWork, shouldDeleteAsset, shareFileIdsForDeletion } = require('./delete-core')
+const { findRemainingWork, shouldDeleteAsset, shareFileIdsForDeletion, revokeReadyShares } = require('./delete-core')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -85,6 +85,24 @@ exports.main = async (event = {}) => {
       return { deleteAsset, shares }
     })
 
+    let remainingShares = []
+    try {
+      remainingShares = await revokeReadyShares(
+        async () => {
+          const result = await db.collection('shareCards')
+            .where({ workId, userId: openid, status: 'ready' }).limit(100).get()
+          return result.data || []
+        },
+        (share) => db.collection('shareCards').doc(share._id).update({
+          data: { status: 'revoked', revokedAt: db.serverDate(), updatedAt: db.serverDate() }
+        })
+      )
+    } catch (error) {
+      // 作品已删除；公开读取会再次核验作品存在性，剩余凭证也无法访问。
+      console.warn('继续撤销作品分享记录失败:', error?.message || error)
+    }
+
+    const shares = [...deletion.shares, ...remainingShares]
     try {
       await deleteFiles([
         ...(deletion.deleteAsset ? [
@@ -93,10 +111,10 @@ exports.main = async (event = {}) => {
           asset?.creationFileId,
           asset?.thumbnailFileId
         ] : []),
-        ...shareFileIdsForDeletion(deletion.shares)
+        ...shareFileIdsForDeletion(shares)
       ])
       await Promise.all([
-        ...deletion.shares.map((share) => db.collection('shareCards').doc(share._id).remove()),
+        ...shares.map((share) => db.collection('shareCards').doc(share._id).remove()),
         ...(deletion.deleteAsset && asset ? [db.collection('imageAssets').doc(asset._id).remove()] : [])
       ])
     } catch (error) {

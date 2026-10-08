@@ -1,5 +1,10 @@
 <view class="page">
-  <view wx:if="{{profileLoading}}" class="state">正在确认登录状态…</view>
+  <view wx:if="{{signedOut}}" class="signed-out-state">
+    <view class="signed-out-title">登录后查看我的作品</view>
+    <view class="signed-out-copy">使用微信身份登录即可查看，头像和昵称可以稍后填写。</view>
+    <button class="ui-button ui-button-primary" bindtap="loginProfile" loading="{{loggingIn}}" disabled="{{loggingIn}}">微信登录</button>
+  </view>
+  <view wx:elif="{{profileLoading}}" class="state">正在确认登录状态…</view>
 
   <block wx:else>
     <view class="profile">
@@ -18,7 +23,7 @@
       <view class="privacy-copy">仅用于展示你的个人资料，不会公开你的作品。</view>
     </view>
 
-    <block wx:elif="{{loading}}"><view class="state">正在整理作品…</view></block>
+    <block wx:if="{{loading}}"><view class="state">正在整理作品…</view></block>
     <block wx:elif="{{errorMessage}}"><view class="state"><view>{{errorMessage}}</view><button class="text-button" bindtap="loadRecentWorks">重新加载</button></view></block>
     <block wx:elif="{{!works.length}}"><view class="state empty"><view class="empty-title">第一张照片，正在等一句话。</view><button class="ui-button ui-button-primary" bindtap="startCreation">开始创作</button></view></block>
     <block wx:else>

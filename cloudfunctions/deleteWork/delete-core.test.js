@@ -27,3 +27,30 @@ test('删除共享图片资产的一份作品时只删除分享成品图', () =>
 
   assert.deepEqual(shareFileIdsForDeletion(shares), ['cloud://share-a.jpg'])
 })
+
+test('删除作品时分批撤销超过一百条的分享快照', async () => {
+  const { revokeReadyShares } = loadCore()
+  const ready = Array.from({ length: 205 }, (_, index) => ({ _id: `share-${index}`, status: 'ready' }))
+  const revoked = await revokeReadyShares(
+    async () => ready.filter((share) => share.status === 'ready').slice(0, 100),
+    async (share) => { share.status = 'revoked' }
+  )
+  assert.equal(revoked.length, 205)
+  assert.equal(ready.filter((share) => share.status === 'ready').length, 0)
+})
+
+test('分享查询持续返回相同记录时停止重试，避免删除函数超时', async () => {
+  const { revokeReadyShares } = loadCore()
+  let reads = 0
+  await assert.rejects(
+    revokeReadyShares(
+      async () => {
+        reads += 1
+        if (reads > 2) throw new Error('fixture should not reach a third read')
+        return [{ _id: 'same-share' }]
+      },
+      async () => {}
+    ),
+    /SHARE_REVOKE_STALLED/
+  )
+})

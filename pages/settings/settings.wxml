@@ -1,11 +1,9 @@
 <view class="page">
-  <view class="section-title">照片与隐私管理</view>
   <view class="card">
-    <view class="item"><view><view>相机权限</view><view class="muted">{{cameraAuthorized ? '已允许' : '未允许'}}</view></view><view class="action" bindtap="openSystemSettings">前往设置</view></view>
-    <view class="item"><view><view>保存到相册</view><view class="muted">{{albumAuthorized ? '已允许' : '未允许'}}</view></view><view class="action" bindtap="openSystemSettings">前往设置</view></view>
     <view class="item" bindtap="openWorks"><view><view>删除我的作品</view><view class="muted">在作品列表中选择删除，删除后不可恢复。</view></view><view class="arrow">›</view></view>
     <view class="item" bindtap="openPrivacy"><view><view>隐私政策</view><view class="muted">了解照片、作品和分享图的保存方式。</view></view><view class="arrow">›</view></view>
   </view>
+  <view class="card logout-card"><view class="item logout-item" bindtap="signOut">退出登录</view></view>
   <view class="section-title">关于照片有话说</view>
   <view class="card about">照片只用于本次内容生成、作品展示和分享图合成。原图在上传 24 小时后由服务端清理；作品删除会撤销分享链接并清理关联文件。</view>
 </view>

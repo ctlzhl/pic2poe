@@ -33,3 +33,49 @@ test('删除操作不占用作品正文的横向空间', () => {
   assert.ok(width >= 72 && height >= 72, '删除文字周围应有足够大的触摸区域')
   assert.ok(fontSize <= 22, '删除文字本身保持轻量')
 })
+
+test('从作品详情返回时继续显示离开前的页码', () => {
+  const previousPage = global.Page
+  const previousWx = global.wx
+  let definition
+  global.Page = (options) => { definition = options }
+  global.wx = { getStorageSync() { return true } }
+  try {
+    delete require.cache[require.resolve('./works.js')]
+    require('./works.js')
+    const requested = []
+    const page = { data: { ...definition.data, page: 3 }, loadWorks(value) { requested.push(value) } }
+    definition.onShow.call(page)
+    assert.deepEqual(requested, [3])
+  } finally {
+    if (previousPage === undefined) delete global.Page
+    else global.Page = previousPage
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})
+
+test('未登录时不能直接打开我的作品列表', () => {
+  const previousPage = global.Page
+  const previousWx = global.wx
+  let definition
+  let destination
+  global.Page = (options) => { definition = options }
+  global.wx = {
+    getStorageSync() { return false },
+    switchTab({ url }) { destination = url },
+    cloud: { callFunction() { assert.fail('未登录不应读取作品') } }
+  }
+  try {
+    delete require.cache[require.resolve('./works.js')]
+    require('./works.js')
+    const page = { data: { ...definition.data }, loadWorks() { assert.fail('未登录不应加载作品') } }
+    definition.onShow.call(page)
+    assert.equal(destination, '/pages/my/my')
+  } finally {
+    if (previousPage === undefined) delete global.Page
+    else global.Page = previousPage
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})

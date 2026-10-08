@@ -1,6 +1,7 @@
 const { callFunctionWithTimeout } = require('../../utils/requestHelper')
 const { showErrorToast } = require('../../utils/errorHandler')
 const { formatDotDate } = require('../../utils/date')
+const { isProfileSignedIn } = require('../../utils/profileSession')
 
 const TYPE_TITLE = { poem: '五言绝句', review: '图片点评', copy: '配图文案' }
 
@@ -15,15 +16,21 @@ Page({
   },
 
   onShow() {
-    this.loadWorks(1)
+    if (!isProfileSignedIn()) {
+      wx.switchTab({ url: '/pages/my/my' })
+      return
+    }
+    this.loadWorks(this.data.page)
   },
 
   async loadWorks(page = 1) {
+    if (!isProfileSignedIn()) return
     if (this.loadingWorks) return
     this.loadingWorks = true
     this.setData({ loading: true, errorMessage: '' })
     try {
       const response = await callFunctionWithTimeout('listWorks', { page, limit: 10 })
+      if (!isProfileSignedIn()) return
       if (!response.result?.ok) throw new Error(response.result?.message || '读取作品列表失败')
       const works = (response.result.data?.works || []).map((work) => ({
         ...work,

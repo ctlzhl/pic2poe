@@ -22,7 +22,10 @@ exports.main = async (event = {}) => {
       .limit(1)
       .get()
     const share = result.data[0]
-    if (!canReadPublicShare(share)) {
+    const workResult = share?.workId
+      ? await db.collection('works').where({ _id: share.workId }).limit(1).get()
+      : { data: [] }
+    if (!canReadPublicShare(share, workResult.data[0])) {
       return fail('SHARE_NOT_FOUND', '分享内容不存在或已失效。')
     }
 

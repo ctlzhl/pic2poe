@@ -6,7 +6,8 @@ const SHARE_TIMEOUT = 55000
 const parseShareToken = (options = {}) => {
   if (typeof options.shareToken === 'string' && options.shareToken) return options.shareToken
   if (typeof options.scene !== 'string' || !options.scene) return ''
-  const scene = decodeURIComponent(options.scene)
+  let scene
+  try { scene = decodeURIComponent(options.scene) } catch (error) { return '' }
   const match = scene.match(/(?:^|&)s=([A-Za-z0-9_-]{20,32})(?:&|$)/)
   return match ? match[1] : ''
 }
@@ -51,6 +52,11 @@ Page({
 
     if (typeof wx.hideShareMenu === 'function') {
       wx.hideShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] })
+    }
+
+    if (options.scene) {
+      this.setData({ loading: false, hasError: true, errorMessage: '分享链接无效或已失效。' })
+      return
     }
 
     const workId = options.workId || ''

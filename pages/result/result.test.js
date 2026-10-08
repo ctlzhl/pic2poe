@@ -99,6 +99,20 @@ test('自己的结果页在分享凭证就绪前不开放好友和朋友圈入�
   }
 })
 
+test('损坏的小程序码场景参数显示失效提示而不使页面崩溃', () => {
+  const page = createPage(loadPageDefinition())
+  const previousWx = global.wx
+  global.wx = { hideShareMenu() {} }
+  try {
+    assert.doesNotThrow(() => page.onLoad({ scene: '%broken' }))
+    assert.equal(page.data.hasError, true)
+    assert.equal(page.data.loading, false)
+  } finally {
+    if (previousWx === undefined) delete global.wx
+    else global.wx = previousWx
+  }
+})
+
 test('分享图生成成功后开放分享入口并静默预下载图片', async () => {
   const definition = loadPageDefinition()
   const page = createPage(definition, { workId: 'work-1' })
