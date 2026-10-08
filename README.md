@@ -6,6 +6,14 @@
 
 创作流程保持简单：**选择照片 → 选择表达方式 → 查看作品 → 保存或分享**。
 
+## 微信小程序体验
+
+微信内扫码体验「照片有话说」：
+
+<p align="center">
+  <img src="assets/images/miniprogram-qrcode.png" alt="照片有话说微信小程序码" width="240" />
+</p>
+
 ## 当前能力
 
 - 图片上传、格式校验与缩略图处理，支持 JPG、PNG、WebP，单张最大 6MB
